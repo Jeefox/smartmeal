@@ -3,6 +3,8 @@ package dev.jeefox.smartmeal.recipe.service;
 import dev.jeefox.smartmeal.exception.DuplicateRecipeProductsException;
 import dev.jeefox.smartmeal.exception.ProductNotFoundException;
 import dev.jeefox.smartmeal.exception.RecipeNotFoundException;
+import dev.jeefox.smartmeal.nutrition.NutritionCalculator;
+import dev.jeefox.smartmeal.nutrition.dto.NutritionValues;
 import dev.jeefox.smartmeal.product.entity.Product;
 import dev.jeefox.smartmeal.product.repository.ProductRepository;
 import dev.jeefox.smartmeal.recipe.dto.CreateRecipeRequest;
@@ -107,6 +109,9 @@ public class RecipeService {
                 .map(RecipeService::ingredientToResponse)
                 .toList();
 
+        NutritionValues nutritionTotal = NutritionCalculator.calculate(ingredients);
+        NutritionValues nutritionPerServing = NutritionCalculator.calculatePortion(ingredients, recipe.getServings());
+
         return new RecipeResponse(
                 recipe.getId(),
                 recipe.getName(),
@@ -115,6 +120,8 @@ public class RecipeService {
                 recipe.getInstructions(),
                 recipe.getPreparationTimeMin(),
                 recipe.getServings(),
+                nutritionTotal,
+                nutritionPerServing,
                 recipe.getCreatedAt(),
                 recipe.getUpdatedAt()
         );

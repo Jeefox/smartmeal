@@ -1,17 +1,13 @@
 package dev.jeefox.smartmeal.exception;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
@@ -54,11 +50,27 @@ public class ApiExceptionHandler {
         return detail;
     }
 
+    @ExceptionHandler(UserProfileNotFoundException.class)
+    public ProblemDetail handleUserProfileNotFound(UserProfileNotFoundException exception){
+        log.debug("{}",exception.getMessage());
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getLocalizedMessage());
+        detail.setTitle("Профиль пользователя не найден");
+        return detail;
+    }
+
     @ExceptionHandler(DuplicateRecipeProductsException.class)
     public ProblemDetail handleDuplicateProducts(DuplicateRecipeProductsException exception){
         log.debug("{}",exception.getMessage());
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getLocalizedMessage());
         detail.setTitle("Продукты в рецепте дублируются");
+        return detail;
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ProblemDetail handleEmailAlreadyExists(EmailAlreadyExistsException exception){
+        log.debug("{}", exception.getMessage());
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getLocalizedMessage());
+        detail.setTitle("Пользователь с таким email уже зарегистрирован");
         return detail;
     }
 }

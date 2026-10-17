@@ -7,16 +7,14 @@ import dev.jeefox.smartmeal.nutrition.NutritionCalculator;
 import dev.jeefox.smartmeal.nutrition.dto.NutritionValues;
 import dev.jeefox.smartmeal.product.entity.Product;
 import dev.jeefox.smartmeal.product.repository.ProductRepository;
-import dev.jeefox.smartmeal.recipe.dto.CreateRecipeRequest;
-import dev.jeefox.smartmeal.recipe.dto.RecipeIngredientRequest;
-import dev.jeefox.smartmeal.recipe.dto.RecipeIngredientResponse;
-import dev.jeefox.smartmeal.recipe.dto.RecipeResponse;
+import dev.jeefox.smartmeal.recipe.dto.*;
 import dev.jeefox.smartmeal.recipe.entity.Recipe;
 import dev.jeefox.smartmeal.recipe.entity.RecipeIngredient;
 import dev.jeefox.smartmeal.recipe.repository.RecipeIngredientRepository;
 import dev.jeefox.smartmeal.recipe.repository.RecipeRepository;
-import org.apache.el.lang.FunctionMapperImpl;
 import org.jspecify.annotations.NonNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,9 +53,9 @@ public class RecipeService {
         List<Long> iterable = request.ingredients()
                 .stream()
                 .map(RecipeIngredientRequest::productId)
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
         Map<Long, Product> products = productRepository.findAllById(iterable).stream()
-                .collect(Collectors.toMap(product -> product.getId(), Function.identity()));
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         Recipe recipe = new Recipe(request.name(), request.description(),
                 request.instructions(), request.preparationTimeMin(), request.servings());
@@ -99,6 +97,20 @@ public class RecipeService {
                 recipeIngredientRepository.findByRecipe_IdOrderByPositionAsc(uuid);
 
         return recipeToResponse(recipe, ingredients);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RecipeSummaryResponse> findByName(String name, Pageable pageable) {
+        boolean hasName = name != null && !name.isBlank();
+        Page<Recipe> recipes;
+        if (hasName) {
+            recipes = recipeRepository.findByNameContainingIgnoreCase(name.trim(), pageable);
+        } else {
+            recipes = recipeRepository.findAll(pageable);
+        }
+        return recipes.map(recipe -> new RecipeSummaryResponse(recipe.getId(),
+                recipe.getName(), recipe.getDescription(),
+                recipe.getPreparationTimeMin(), recipe.getServings()));
     }
 
     private RecipeResponse recipeToResponse(

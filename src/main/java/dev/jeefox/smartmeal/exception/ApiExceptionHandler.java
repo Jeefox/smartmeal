@@ -58,6 +58,14 @@ public class ApiExceptionHandler {
         return detail;
     }
 
+    @ExceptionHandler(MealPlanNotFoundException.class)
+    public ProblemDetail handleMealPlanNotFound(MealPlanNotFoundException exception){
+        log.debug("{}",exception.getMessage());
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getLocalizedMessage());
+        detail.setTitle("Меню на эту дату не найдено");
+        return detail;
+    }
+
     @ExceptionHandler(DuplicateRecipeProductsException.class)
     public ProblemDetail handleDuplicateProducts(DuplicateRecipeProductsException exception){
         log.debug("{}",exception.getMessage());
@@ -73,6 +81,14 @@ public class ApiExceptionHandler {
         detail.setTitle("Пользователь с таким email уже зарегистрирован");
         return detail;
     }
+
+    @ExceptionHandler(MealPlanAlreadyExistsException.class)
+    public ProblemDetail handleMealPlanAlreadyExists(MealPlanAlreadyExistsException exception){
+        log.debug("{}", exception.getMessage());
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getLocalizedMessage());
+        detail.setTitle("Меню на эту дату уже есть");
+        return detail;
+    }
     @ExceptionHandler(ProfileIncompleteException.class)
     public ProblemDetail handleProfileIncomplete(
             ProfileIncompleteException exception) {
@@ -82,6 +98,35 @@ public class ApiExceptionHandler {
                 exception.getMessage()
         );
         detail.setTitle("Анкета не заполнена");
+        return detail;
+    }
+    @ExceptionHandler(MealPlanNotEditableException.class)
+    public ProblemDetail handleMealPlanNotEditable(MealPlanNotEditableException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Меню недоступно для редактирования");
+        return detail;
+    }
+
+    @ExceptionHandler(MealPlanEntryNotFoundException.class)
+    public ProblemDetail handleMealPlanEntryNotFound(MealPlanEntryNotFoundException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        detail.setTitle("Блюдо меню не найдено");
+        return detail;
+    }
+
+    @ExceptionHandler(MenuEntryNotExistsException.class)
+    public ProblemDetail handleMenuEntryNotExists(MenuEntryNotExistsException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Меню пустое");
+        return detail;
+    }
+
+    @ExceptionHandler(DailyCalorieTargetNotSetException.class)
+    public ProblemDetail handleDailyCalorieTargetNotSet(DailyCalorieTargetNotSetException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Суточная цель не задана");
         return detail;
     }
 }

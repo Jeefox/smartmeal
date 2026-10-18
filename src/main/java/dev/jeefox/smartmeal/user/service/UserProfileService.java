@@ -2,6 +2,7 @@ package dev.jeefox.smartmeal.user.service;
 
 import dev.jeefox.smartmeal.exception.UserProfileNotFoundException;
 import dev.jeefox.smartmeal.user.dto.UpdateDailyCalorieTargetRequest;
+import dev.jeefox.smartmeal.user.dto.UpdateUserProfileRequest;
 import dev.jeefox.smartmeal.user.dto.UserProfileResponse;
 import dev.jeefox.smartmeal.user.entity.User;
 import dev.jeefox.smartmeal.user.entity.UserProfile;
@@ -30,7 +31,7 @@ public class UserProfileService {
                 .orElseThrow(()-> new UsernameNotFoundException("Пользователь не найден"));
         UserProfile profile = userProfileRepository.findById(user.getId())
                 .orElseThrow(()-> new UserProfileNotFoundException(user.getId()));
-        return new UserProfileResponse(profile.getUserId(), profile.getDailyCalorieTarget());
+        return UserProfileResponse.from(profile);
     }
 
     @Transactional
@@ -40,7 +41,18 @@ public class UserProfileService {
         UserProfile profile = userProfileRepository.findById(user.getId())
                 .orElseThrow(()-> new UserProfileNotFoundException(user.getId()));
         profile.updateDailyCalorieTarget(request.dailyCalorieTarget());
-        UserProfileResponse response = new UserProfileResponse(profile.getUserId(), profile.getDailyCalorieTarget());
-        return response;
+        return UserProfileResponse.from(profile);
+    }
+
+    @Transactional
+    public UserProfileResponse updateProfile(
+            String email,
+            UpdateUserProfileRequest request
+    ){
+        User user = userRepository.findByEmail(email).orElseThrow(()-> new UsernameNotFoundException("Пользователь не найден"));
+        UserProfile profile = userProfileRepository.findById(user.getId()).orElseThrow(()-> new UserProfileNotFoundException(user.getId()));
+        profile.updateProfile(request.age(), request.sex(), request.heightCm(), request.weightKg(),
+                request.activityLevel(), request.goal());
+        return UserProfileResponse.from(profile);
     }
 }

@@ -33,6 +33,10 @@ public class UserProfile {
     @Column(name = "age")
     private Short age;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex", length = 16)
+    private Sex sex;
+
     @Positive
     @Column(name = "height_cm")
     private Integer heightCm;
@@ -68,6 +72,22 @@ public class UserProfile {
     public UserProfile(User user) {
         this.user = user;
     }
+
+    public void updateProfile(
+            Short age,
+            Sex sex,
+            Integer heightCm,
+            BigDecimal weightKg,
+            ActivityLevel activityLevel,
+            Goal goal){
+        this.age = age;
+        this.sex = sex;
+        this.heightCm = heightCm;
+        this.weightKg = weightKg;
+        this.activityLevel = activityLevel;
+        this.goal = goal;
+    }
+
     public void updateDailyCalorieTarget(Integer dailyCalorieTarget){
         this.dailyCalorieTarget = dailyCalorieTarget;
     }

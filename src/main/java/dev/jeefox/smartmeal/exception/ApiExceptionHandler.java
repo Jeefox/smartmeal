@@ -73,4 +73,15 @@ public class ApiExceptionHandler {
         detail.setTitle("Пользователь с таким email уже зарегистрирован");
         return detail;
     }
+    @ExceptionHandler(ProfileIncompleteException.class)
+    public ProblemDetail handleProfileIncomplete(
+            ProfileIncompleteException exception) {
+
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                exception.getMessage()
+        );
+        detail.setTitle("Анкета не заполнена");
+        return detail;
+    }
 }

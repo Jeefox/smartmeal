@@ -34,8 +34,6 @@ public class RegistrationService {
         UserProfile savedProfile = userProfileRepository.save(
                 new UserProfile(savedUser));
 
-        return new UserProfileResponse(
-                savedUser.getId(),
-                savedProfile.getDailyCalorieTarget());
+        return UserProfileResponse.from(savedProfile);
     }
 }

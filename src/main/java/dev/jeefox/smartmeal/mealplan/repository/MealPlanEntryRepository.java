@@ -20,4 +20,6 @@ public interface MealPlanEntryRepository extends JpaRepository<MealPlanEntry, UU
             UUID mealPlanId, MealType mealType);
 
     boolean existsByMealPlan_Id(UUID mealPlanId);
+
+    List<MealPlanEntry> findByMealPlan_IdIn(List<UUID> mealPlanIds);
 }

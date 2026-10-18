@@ -9,6 +9,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,4 +22,8 @@ public interface MealPlanRepository extends JpaRepository<MealPlan, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from MealPlan p where p.id = :id and p.user.email = :email")
     Optional<MealPlan> findOwnedForUpdate(@Param("id") UUID id, @Param("email") String email);
+
+    List<MealPlan> findByUser_IdAndPlanDateBetweenOrderByPlanDateAsc(
+            UUID userId, LocalDate from, LocalDate to
+    );
 }

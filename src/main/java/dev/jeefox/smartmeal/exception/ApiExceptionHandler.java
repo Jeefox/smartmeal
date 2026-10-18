@@ -129,4 +129,12 @@ public class ApiExceptionHandler {
         detail.setTitle("Суточная цель не задана");
         return detail;
     }
+
+    @ExceptionHandler(InvalidShoppingListPeriodException.class)
+    public ProblemDetail handleInvalidShoppingListPeriod(InvalidShoppingListPeriodException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        detail.setTitle("Некорректный период списка покупок");
+        return detail;
+    }
 }

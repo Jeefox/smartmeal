@@ -37,3 +37,10 @@ build/
 .env
 .env.*
 !.env.example
+
+# Local planning/specification documents: do not publish
+/docs/plans/
+
+# Local logs and operating-system metadata
+*.log
+.DS_Store

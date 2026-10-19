@@ -137,4 +137,36 @@ public class ApiExceptionHandler {
         detail.setTitle("Некорректный период списка покупок");
         return detail;
     }
+
+    @ExceptionHandler(InvalidStoreFilterException.class)
+    public ProblemDetail handleInvalidStoreFilter(InvalidStoreFilterException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        detail.setTitle("Некорректные параметры поиска магазинов");
+        return detail;
+    }
+
+    @ExceptionHandler(StoreNotFoundException.class)
+    public ProblemDetail handleStoreNotFound(StoreNotFoundException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        detail.setTitle("Магазин не найден");
+        return detail;
+    }
+
+    @ExceptionHandler(StoreProductNotFoundException.class)
+    public ProblemDetail handleStoreProductNotFound(StoreProductNotFoundException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        detail.setTitle("Товар магазина не найден");
+        return detail;
+    }
+
+    @ExceptionHandler(PriceObservationNotFoundException.class)
+    public ProblemDetail handlePriceObservationNotFound(PriceObservationNotFoundException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        detail.setTitle("Цена ещё не добавлена");
+        return detail;
+    }
 }

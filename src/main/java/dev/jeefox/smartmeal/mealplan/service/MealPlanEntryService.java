@@ -45,7 +45,8 @@ public class MealPlanEntryService {
         RecipeSnapshot snapshot = new RecipeSnapshot(recipe.getId(), recipe.getName(), recipe.getDescription(),
                 recipe.getInstructions(), recipe.getPreparationTimeMin(), recipe.getServings(),
                 recipeIngredients.stream().map(item -> new RecipeIngredientSnapshot(
-                        item.getProduct().getId(), item.getProduct().getName(), item.getQuantityG())).toList(),
+                        item.getProduct().getId(), item.getProduct().getName(), item.getQuantityG(),
+                        item.getProduct().getShoppingName(), item.getProduct().getEdibleYield())).toList(),
                 NutritionCalculator.calculateTotals(recipeIngredients),
                 NutritionCalculator.calculatePortion(recipeIngredients, recipe.getServings()));
         int position = entries.findFirstByMealPlan_IdAndMealTypeOrderByPositionDesc(planId, request.mealType())

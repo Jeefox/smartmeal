@@ -13,6 +13,8 @@ public record ProductResponse(
         BigDecimal fatPer100g,
         BigDecimal carbsPer100g,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String shoppingName,
+        BigDecimal edibleYield
 ) {
 }

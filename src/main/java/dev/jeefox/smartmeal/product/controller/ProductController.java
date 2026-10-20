@@ -69,7 +69,7 @@ public class ProductController {
                 product.getDescription(), product.getCaloriesPer100g(),
                 product.getProteinPer100g(), product.getFatPer100g(),
                 product.getCarbsPer100g(), product.getCreatedAt(),
-                product.getUpdatedAt());
+                product.getUpdatedAt(), product.getShoppingName(), product.getEdibleYield());
         return response;
     }
 }

@@ -124,6 +124,35 @@ class ShoppingListServiceTest {
         assertEquals(new BigDecimal("50.00"), response.items().getFirst().quantityG());
     }
 
+    @Test
+    void convertsEdibleWeightToPurchaseWeightBeforeSumming() {
+        MealPlan plan = plan(owner, start, false);
+        entry(plan, 2, "1", new RecipeIngredientSnapshot(1L, "Банан без кожуры",
+                new BigDecimal("100"), "Бананы", new BigDecimal("0.5")));
+        entry(plan, 1, "1", new RecipeIngredientSnapshot(1L, "Банан без кожуры",
+                new BigDecimal("25"), "Бананы", new BigDecimal("0.5")));
+        ShoppingListResponse result = read(start, start);
+        assertEquals(new ShoppingListItemResponse(1L, "Бананы", new BigDecimal("150.00")),
+                result.items().getFirst());
+    }
+
+    @Test
+    void readsLegacyJsonWithoutShoppingFields() {
+        MealPlan plan = plan(owner, start, false);
+        entry(plan, 1, "1", ingredient("100"));
+        em.flush();
+        em.createNativeQuery("""
+                update meal_plan_entries
+                set recipe_snapshot = jsonb_set(recipe_snapshot, '{ingredients}',
+                    jsonb_build_array((recipe_snapshot -> 'ingredients' -> 0) - 'shoppingName' - 'edibleYield'))
+                where meal_plan_id = :planId
+                """).setParameter("planId", plan.getId()).executeUpdate();
+        em.clear();
+        ShoppingListResponse result = service.calculate(owner.getEmail(), start, start);
+        assertEquals(new ShoppingListItemResponse(1L, "Рис", new BigDecimal("100.00")),
+                result.items().getFirst());
+    }
+
     private ShoppingListResponse read(LocalDate from, LocalDate to) {
         em.flush();
         em.clear();

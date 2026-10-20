@@ -467,6 +467,10 @@ export function RecipeDetail() {
               />
             </label>
             {!valid && <p className="field-error">Введите от 0,1 до 100 порций</p>}
+            <p className="caption">
+              Вес сырой съедобной части до приготовления. Покупная масса рассчитывается отдельно на
+              сервере.
+            </p>
             <ul className="ingredient-list">
               {recipe.ingredients.map((item) => (
                 <li key={item.productId}>
@@ -542,7 +546,7 @@ export function Products() {
       <PageHeading
         eyebrow="ОСНОВА ВАШИХ РЕЦЕПТОВ"
         title="Каталог продуктов"
-        description="Пищевая ценность на 100 г. Сухие и готовые продукты — разные записи."
+        description="Пищевая ценность на 100 г сырой съедобной части до приготовления."
       />
       <div className="filters">
         <label className="search-field">
@@ -577,6 +581,15 @@ export function Products() {
             <article className="panel" key={product.id}>
               <span className="eyebrow">ПРОДУКТ · {product.id}</span>
               <h3>{product.name}</h3>
+              {mode === 'api' && (
+                <p className="caption">
+                  Для покупок: {product.shoppingName ?? 'не указано'}
+                  <br />
+                  Доля съедобной части:{' '}
+                  {product.edibleYield == null ? 'не указана' : number(product.edibleYield, 6)}.
+                  Значение из справочника; источник измерения не указан.
+                </p>
+              )}
               <NutritionValues
                 nutrition={{
                   calories: product.caloriesPer100g,

@@ -44,6 +44,7 @@ class MealPlanEntryServiceTest {
     @Autowired private EntityManager em;
     @Autowired private MealPlanEntryService service;
     @Autowired private MealPlanService planService;
+    @Autowired private dev.jeefox.smartmeal.shopping.service.ShoppingListService shopping;
     @Autowired private WebApplicationContext context;
 
     private User owner;
@@ -82,6 +83,22 @@ class MealPlanEntryServiceTest {
         em.flush();
         em.clear();
         assertEquals(added, service.findById(email, planId, added.id()));
+    }
+
+    @Test
+    void freezesShoppingDetailsWithoutChangingNutrition() {
+        product.updateShoppingDetails("Крупа для покупок", new BigDecimal("0.5"));
+        MealPlanEntryResponse added = add(MealType.LUNCH, "1.50");
+        assertEquals(new BigDecimal("262.50"), added.nutrition().calories());
+        var ingredient = added.recipeSnapshot().ingredients().getFirst();
+        assertEquals("Крупа для покупок", ingredient.shoppingName());
+        assertEquals(0, new BigDecimal("0.5").compareTo(ingredient.edibleYield()));
+        product.updateShoppingDetails("Новое название", BigDecimal.ONE);
+        em.flush();
+        em.clear();
+        var result = shopping.calculate(owner.getEmail(), plan.getPlanDate(), plan.getPlanDate());
+        assertEquals("Крупа для покупок", result.items().getFirst().productName());
+        assertEquals(new BigDecimal("150.00"), result.items().getFirst().quantityG());
     }
 
     @Test

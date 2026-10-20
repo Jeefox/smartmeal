@@ -3,6 +3,8 @@ export type Ingredient = {
   id?: string;
   productId: number;
   productName: string;
+  shoppingName?: string;
+  edibleYield?: number;
   quantityG: number;
   position?: number;
 };
@@ -42,6 +44,8 @@ export type Page<T> = {
   totalPages: number;
 };
 export type Product = {
+  shoppingName?: string;
+  edibleYield?: number;
   id: number;
   categoryId: number;
   name: string;

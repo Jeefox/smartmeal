@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import ShoppingEstimate from '../components/ShoppingEstimate';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Leaf, PackageOpen, RefreshCw, ShoppingBasket } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router';
@@ -58,7 +59,7 @@ export default function LiveShopping() {
       <PageHeading
         eyebrow="ПО ВАШЕМУ МЕНЮ"
         title="Продукты для покупок"
-        description="Суммарная потребность в граммах за выбранный период. Обе даты включены."
+        description="Покупная масса с учётом очистки, уже рассчитанная сервером. Обе даты включены."
         actions={
           <button
             className="button"
@@ -130,6 +131,7 @@ export default function LiveShopping() {
           </p>
         )}
       </section>
+      <ShoppingEstimate from={from} to={to} rangeValid={rangeValid} />
       {!rangeValid ? (
         <Notice tone="warning">
           Период в адресе страницы некорректен. Исправьте даты и примените выбор. Запрос не
@@ -232,8 +234,8 @@ export default function LiveShopping() {
                 Учитываются черновики и подтверждённые дни.
               </p>
               <Notice>
-                Это граммы ингредиентов. Цены, целые упаковки и домашние остатки пока не
-                учитываются.
+                Здесь указана покупная масса с учётом очистки. Выберите магазин выше для расчёта
+                целых упаковок и оценочной стоимости. Домашние запасы не вычитаются.
               </Notice>
               <p className="caption">
                 Отметки «куплено» и замены появятся после подключения их сохранения. Сейчас список

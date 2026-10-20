@@ -322,7 +322,8 @@ export default function RecipeEditor() {
                   </button>
                 </div>
                 <p className="muted">
-                  Масса исходных продуктов в граммах. Порядок сохранится в рецепте.
+                  Масса сырой съедобной части до приготовления, в граммах. Поправку на очистку
+                  рассчитает сервер при покупке.
                 </p>
                 {errors.ingredients && <p className="field-error">{errors.ingredients}</p>}
                 {rows.length === 0 ? (

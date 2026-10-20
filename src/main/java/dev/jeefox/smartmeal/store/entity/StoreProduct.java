@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Getter
@@ -62,15 +63,19 @@ public class StoreProduct {
         this.active = true;
     }
 
+    public void changeActivity(boolean active) {
+        this.active = active;
+    }
+
     @PrePersist
     protected void onCreate(){
-        var now = Instant.now();
+        var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate(){
-        this.updatedAt = Instant.now();
+        this.updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 }

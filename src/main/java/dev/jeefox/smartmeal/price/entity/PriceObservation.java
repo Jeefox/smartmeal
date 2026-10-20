@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Getter
@@ -50,6 +51,32 @@ public class PriceObservation {
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "invalidated_at")
+    private Instant invalidatedAt;
+
+    @Column(name = "invalidation_reason", length = 300)
+    private String invalidationReason;
+
+    @Column(name = "invalidated_by", columnDefinition = "text")
+    private String invalidatedBy;
+
+    public boolean isInvalidated() {
+        return invalidatedAt != null;
+    }
+
+    public void invalidate(String reason, String actor) {
+        if (isInvalidated()) {
+            return;
+        }
+        if (reason == null || reason.isBlank() || reason.trim().length() > 300
+                || actor == null || actor.isBlank()) {
+            throw new IllegalArgumentException("Укажите причину аннулирования и пользователя");
+        }
+        invalidationReason = reason.trim();
+        invalidatedBy = actor;
+        invalidatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
 
     public PriceObservation(
             StoreProduct storeProduct,

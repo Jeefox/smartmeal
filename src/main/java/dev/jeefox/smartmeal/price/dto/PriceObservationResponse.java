@@ -13,7 +13,10 @@ public record PriceObservationResponse(
         Instant observedAt,
         PriceSource priceSource,
         Boolean promotional,
-        Instant createdAt
+        Instant createdAt,
+        boolean invalidated,
+        Instant invalidatedAt,
+        String invalidationReason
 ) {
 
     public static PriceObservationResponse from(PriceObservation observation){
@@ -24,6 +27,9 @@ public record PriceObservationResponse(
                 observation.getObservedAt(),
                 observation.getPriceSource(),
                 observation.isPromotional(),
-                observation.getCreatedAt());
+                observation.getCreatedAt(),
+                observation.isInvalidated(),
+                observation.getInvalidatedAt(),
+                observation.getInvalidationReason());
     }
 }

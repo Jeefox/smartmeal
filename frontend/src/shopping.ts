@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { request } from './api';
 export type ShoppingNeeds = {
   from: string;
@@ -27,3 +28,12 @@ export function periodErrors(from: string, to: string): Record<string, string> {
 }
 export const readShoppingNeeds = (from: string, to: string, signal?: AbortSignal) =>
   request<ShoppingNeeds>(`/me/shopping-list?${new URLSearchParams({ from, to })}`, { signal });
+
+// Menu changes affect both ingredient needs and all store estimates for this account.
+export async function invalidateShopping(client: QueryClient, userId: string) {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: ['shopping-needs', userId] }),
+    client.invalidateQueries({ queryKey: ['shopping-estimate', userId] }),
+    client.invalidateQueries({ queryKey: ['shopping-comparison', userId] }),
+  ]);
+}

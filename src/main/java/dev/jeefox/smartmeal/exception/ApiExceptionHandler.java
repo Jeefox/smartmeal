@@ -169,4 +169,25 @@ public class ApiExceptionHandler {
         detail.setTitle("Цена ещё не добавлена");
         return detail;
     }
+
+    @ExceptionHandler(StoreInactiveException.class)
+    public ProblemDetail handleStoreInactive(StoreInactiveException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Магазин неактивен");
+        return detail;
+    }
+    @ExceptionHandler(InvalidShoppingComparisonException.class)
+    public ProblemDetail handleInvalidShoppingComparison(InvalidShoppingComparisonException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        detail.setTitle("Некорректные параметры сравнения магазинов");
+        return detail;
+    }
+    @ExceptionHandler(PriceObservationEntryNotFoundException.class)
+    public ProblemDetail handlePriceObservationEntryNotFound(PriceObservationEntryNotFoundException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        detail.setTitle("Запись цены не найдена");
+        return detail;
+    }
 }

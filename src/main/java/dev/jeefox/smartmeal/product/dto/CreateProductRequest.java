@@ -26,6 +26,12 @@ public record CreateProductRequest (
         @NotNull
         @PositiveOrZero
         @Digits(integer = 5, fraction = 2)
-        BigDecimal carbsPer100g
+        BigDecimal carbsPer100g,
+        @Pattern(regexp = "(?s).*\\S.*", message = "не должно быть пустым")
+        String shoppingName,
+        @DecimalMin(value = "0", inclusive = false)
+        @DecimalMax("1")
+        @Digits(integer = 1, fraction = 6)
+        BigDecimal edibleYield
 )
 {}

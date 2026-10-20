@@ -357,7 +357,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
               <ShoppingBasket size={27} />
               <h2 className="live-budget-title">Продукты по меню</h2>
               <p>
-                Потребность в граммах уже доступна. Цены, упаковки и бюджет пока не рассчитываются.
+                Выберите магазин в списке покупок, чтобы рассчитать упаковки и оценочную стоимость.
               </p>
               <Link
                 to={`/shopping?from=${week ? dates[0] : selectedDate}&to=${week ? dates[6] : selectedDate}`}

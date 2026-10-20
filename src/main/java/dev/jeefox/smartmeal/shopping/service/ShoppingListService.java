@@ -87,14 +87,15 @@ public class ShoppingListService {
                         .multiply(entry.getPortions())
                         .divide(
                                 BigDecimal.valueOf(snapshot.servings()),
-                                MathContext.DECIMAL128);
+                                MathContext.DECIMAL128)
+                        .divide(ingredient.edibleYield(), MathContext.DECIMAL128);
 
                 Long productId = ingredient.productId();
 
                 quantities.merge(productId, ingredientQuantity, BigDecimal::add);
 
                 ProductLabel candidate =
-                        new ProductLabel(ingredient.productName(), planDate);
+                        new ProductLabel(ingredient.shoppingName(), planDate);
 
                 labels.merge(productId, candidate, (existing, incoming) -> {
                     if (incoming.date().isAfter(existing.date())) {

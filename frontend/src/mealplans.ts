@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, request } from './api';
 import { useSession } from './session';
+import { invalidateShopping } from './shopping';
 import type { Ingredient, Nutrition, Recipe } from './types';
 export type ApiMealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
 export const mealTypes: ApiMealType[] = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
@@ -92,7 +93,7 @@ export function useRefreshPlan() {
   const client = useQueryClient();
   const userId = useSession().profile!.userId;
   return async (date: string) => {
-    await client.invalidateQueries({ queryKey: ['shopping-needs', userId] });
+    await invalidateShopping(client, userId);
     await client.invalidateQueries({ queryKey: mealPlanKey(userId, date), refetchType: 'none' });
     return client.fetchQuery({
       queryKey: mealPlanKey(userId, date),

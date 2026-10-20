@@ -26,7 +26,8 @@ public class NutritionCalculator {
         );
     }
 
-    private static NutritionValues calculateTotals(List<RecipeIngredient> ingredients) {
+    // Exact totals are also stored in recipe snapshots to avoid rounding before portion scaling.
+    public static NutritionValues calculateTotals(List<RecipeIngredient> ingredients) {
                Objects.requireNonNull(ingredients, "Список ингредиентов не может быть null");
 
         if (ingredients.isEmpty()) {

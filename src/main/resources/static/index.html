@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SmartMeal — рецепты, продукты и вдохновение для вашей кухни.">
+  <title>SmartMeal — готовьте с удовольствием</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 40 40%27%3E%3Crect width=%2740%27 height=%2740%27 rx=%2712%27 fill=%27%23365b39%27/%3E%3Ctext x=%2710%27 y=%2729%27 fill=%27white%27 font-size=%2730%27%3Es%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"><script src="app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#recipes"><span class="brand-icon">s<span>m</span></span>smartmeal<span class="brand-dot">.</span></a>
+    <div class="workspace">ВАША КУХНЯ</div>
+    <nav aria-label="Главная навигация">
+      <button class="nav-item active" data-view="recipes"><span>▦</span> Все рецепты <b id="recipe-count">6</b></button>
+      <button class="nav-item" data-view="favorites"><span>♡</span> Избранное <b id="favorite-count">0</b></button>
+      <button class="nav-item" data-view="mine"><span>▤</span> Мои рецепты</button>
+      <button class="nav-item" data-view="products"><span>◉</span> Продукты</button>
+    </nav>
+    <div class="sidebar-note"><span class="note-sprig">✳</span><h3>Хороший день начинается на кухне</h3><p>Сохраните любимые рецепты, чтобы они всегда были под рукой.</p><button id="show-favorites">Открыть избранное ↗</button></div>
+    <button class="connection" id="connection"><span id="status-dot"></span><span id="connection-label">Деморежим</span><span>⚙</span></button>
+    <div class="sidebar-footer">Сделано с аппетитом <span>✳</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><span>Моя кулинарная книга <span class="slash">/</span> <b id="breadcrumb">Все рецепты</b></span><button class="button primary" id="add-recipe"><span>＋</span> Добавить рецепт</button></header>
+    <section class="hero" id="hero"><div class="hero-copy"><div class="eyebrow"><span></span> МЕНЬШЕ РУТИНЫ. БОЛЬШЕ ВКУСА.</div><h1>Что приготовим<br><em>сегодня?</em></h1><p>Простые идеи для особенных моментов.<br>Найдите свой следующий любимый рецепт.</p><button class="hero-link" id="surprise">Помогите выбрать <span>↗</span></button></div><div class="hero-photo"><img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=85" alt="Яркий салат со свежими овощами"><span class="photo-caption">свежие идеи каждый день</span></div><span class="hero-decoration">✳</span></section>
+    <section class="catalog">
+      <div class="section-heading"><div><div class="eyebrow green" id="section-kicker">ВДОХНОВЕНИЕ НА КАЖДЫЙ ДЕНЬ</div><h2 id="section-title">Все рецепты <span id="visible-count">6</span></h2></div><span class="small-note" id="mode-note">Демонстрационные рецепты</span></div>
+      <div class="toolbar"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Найти рецепт или ингредиент…" aria-label="Поиск рецептов"></label><select id="time-filter" aria-label="Время приготовления"><option value="0">Любое время</option><option value="20">До 20 минут</option><option value="30">До 30 минут</option><option value="60">До 1 часа</option></select><select id="sort" aria-label="Сортировка"><option value="default">Сначала новые</option><option value="time">Сначала быстрые</option><option value="name">По названию</option></select></div>
+      <div class="chips" id="categories" aria-label="Категории рецептов"><button class="chip active" data-category="Все">Все рецепты</button><button class="chip" data-category="Завтраки">☀ Завтраки</button><button class="chip" data-category="Основные блюда">♨ Основные блюда</button><button class="chip" data-category="Салаты">❋ Салаты</button><button class="chip" data-category="Супы">◡ Супы</button><button class="chip" data-category="Десерты">♧ Десерты</button></div>
+      <div id="notice" class="notice" hidden></div><div class="recipe-grid" id="grid"></div>
+      <div id="empty" class="empty" hidden><span>⌕</span><h3>Здесь пока пусто</h3><p id="empty-text">Попробуйте другой запрос или снимите фильтры.</p><button class="button" id="reset">Сбросить фильтры</button></div>
+      <div class="catalog-bottom"><span id="result-summary"></span><span>Вкусное начинается с простого <span class="green">✳</span></span></div>
+    </section>
+    <footer>smartmeal<span class="green">.</span><span>Ваша маленькая большая кухня</span></footer>
+  </main>
+  <dialog id="recipe-dialog"><div id="recipe-detail"></div></dialog>
+  <dialog id="create-dialog"><form id="recipe-form"><div class="dialog-header"><div><div class="eyebrow green">ВАША КУЛИНАРНАЯ ИДЕЯ</div><h2>Новый рецепт</h2></div><button class="icon-button" type="button" data-close aria-label="Закрыть">×</button></div><p class="form-hint" id="create-hint"></p><label>Название<input name="name" required maxlength="200" placeholder="Например, паста с томатами"></label><label>Описание<textarea name="description" rows="2" placeholder="Что делает этот рецепт особенным?"></textarea></label><div class="form-row"><label>Время, мин<input name="preparationTimeMin" type="number" min="0" max="10080" value="25" required></label><label>Порции<input name="servings" type="number" min="1" max="1000" value="2" required></label></div><div class="ingredient-heading"><h3>Ингредиенты</h3><button type="button" id="add-ingredient" class="text-button">＋ Добавить</button></div><p class="form-hint">Укажите продукты и массу в граммах. В API-режиме выбирайте продукты из справочника.</p><div id="ingredients"></div><label>Приготовление<textarea name="instructions" rows="4" required placeholder="Опишите шаги приготовления, каждый с новой строки"></textarea></label><p role="alert" id="form-error" class="error"></p><div class="dialog-actions"><button class="button" type="button" data-close>Отмена</button><button class="button primary" type="submit" id="save-recipe">Сохранить рецепт</button></div></form></dialog>
+  <dialog id="settings-dialog"><form id="settings-form"><div class="dialog-header"><h2>Подключение</h2><button class="icon-button" type="button" data-close aria-label="Закрыть">×</button></div><label>Источник данных<select id="data-mode"><option value="demo">Деморежим — данные в браузере</option><option value="api">SmartMeal API — на текущем сервере</option></select></label><p class="form-hint">API-режим работает, когда этот интерфейс открыт через Spring Boot. Рецепты создаются в PostgreSQL. Пока API не поддерживает общий список, здесь отображаются рецепты, созданные или открытые в этом браузере.</p><label>ID существующего рецепта<input id="lookup-id" placeholder="UUID рецепта"><small>Необязательно. Чтобы открыть рецепт из базы по его ID.</small></label><p id="settings-error" class="error" role="alert"></p><div class="dialog-actions"><button class="button primary" type="submit">Применить</button></div></form></dialog>
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>

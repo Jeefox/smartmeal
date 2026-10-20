@@ -2,6 +2,10 @@ package dev.jeefox.smartmeal.product.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
@@ -29,6 +33,18 @@ public class Product {
     @Column(nullable = false)
     @NotNull
     private String name;
+
+    @NotBlank
+    @Column(name = "shopping_name", nullable = false, columnDefinition = "text")
+    private String shoppingName;
+
+    @NotNull
+    @DecimalMin(value = "0", inclusive = false)
+    @DecimalMax("1")
+    @Digits(integer = 1, fraction = 6)
+    @Column(name = "edible_yield", nullable = false, precision = 7, scale = 6)
+    private BigDecimal edibleYield;
+
 
     @Column(length = 300)
     @Size(max = 300)
@@ -83,6 +99,32 @@ public class Product {
         this.proteinPer100g = proteinPer100g;
         this.fatPer100g = fatPer100g;
         this.carbsPer100g = carbsPer100g;
+        this.shoppingName = name;
+        this.edibleYield = BigDecimal.ONE;
+    }
+
+    public Product(ProductCategory category, String name, String description,
+                   Integer caloriesPer100g, BigDecimal proteinPer100g,
+                   BigDecimal fatPer100g, BigDecimal carbsPer100g,
+                   String shoppingName, BigDecimal edibleYield) {
+        this(category, name, description, caloriesPer100g, proteinPer100g, fatPer100g, carbsPer100g);
+        updateShoppingDetails(shoppingName, edibleYield);
+    }
+
+    public void updateShoppingDetails(String shoppingName, BigDecimal edibleYield) {
+        if (shoppingName != null) {
+            if (shoppingName.isBlank()) {
+                throw new IllegalArgumentException("Название для покупок не должно быть пустым");
+            }
+            this.shoppingName = shoppingName.trim();
+        }
+        if (edibleYield != null) {
+            if (edibleYield.signum() <= 0 || edibleYield.compareTo(BigDecimal.ONE) > 0
+                    || Math.max(0, edibleYield.stripTrailingZeros().scale()) > 6) {
+                throw new IllegalArgumentException("Доля съедобной части должна быть больше 0 и не больше 1, до 6 знаков после запятой");
+            }
+            this.edibleYield = edibleYield;
+        }
     }
 
     public void updateProduct(ProductCategory category, String name,

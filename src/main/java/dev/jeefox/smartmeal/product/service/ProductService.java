@@ -30,7 +30,8 @@ public class ProductService {
                 .orElseThrow(() -> new ProductCategoryNotFoundException(request.categoryId()));
         Product product = new Product(category, request.name(),
                 request.description(), request.caloriesPer100g(), request.proteinPer100g(),
-                request.fatPer100g(), request.carbsPer100g());
+                request.fatPer100g(), request.carbsPer100g(),
+                request.shoppingName(), request.edibleYield());
 
         return productRepository.save(product);
     }
@@ -67,6 +68,7 @@ public class ProductService {
         product.updateProduct(category, request.name(), request.description(),
                 request.caloriesPer100g(), request.proteinPer100g(),
                 request.fatPer100g(), request.carbsPer100g());
+        product.updateShoppingDetails(request.shoppingName(), request.edibleYield());
         return product;
     }
 }

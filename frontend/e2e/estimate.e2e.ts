@@ -7,6 +7,8 @@ async function fixture(page: Page) {
     empty: false,
     complete: false,
     storesEmpty: false,
+    reference: false,
+    weighted: false,
     calls: [] as string[],
   };
   await page.addInitScript(() => localStorage.setItem('smartmeal.v2.mode', '"api"'));
@@ -60,12 +62,16 @@ async function fixture(page: Page) {
         storeProductId: 700,
         storeProductName: 'Упаковка риса API',
         packageWeightG: 500,
-        packageCount: 3,
+        packageCount: state.weighted ? null : 3,
         packagePrice: 100.25,
         purchaseCost: 300.75,
         remainderG: 249,
         priceObservedAt: '2020-01-05T10:20:00Z',
-        priceSource: 'MANUAL',
+        priceSource: state.reference ? null : 'MANUAL',
+        referencePrice: state.reference,
+        referenceSourceName: state.reference ? 'Тестовый каталог' : null,
+        referenceSourceScope: state.reference ? 'Офлайн-точка Тулы не подтверждена' : null,
+        referenceSourceUrl: state.reference ? 'https://example.invalid/reference' : null,
       };
       return route.fulfill({
         json: {
@@ -73,7 +79,7 @@ async function fixture(page: Page) {
           to: url.searchParams.get('to'),
           storeId: Number(url.searchParams.get('storeId')),
           containsDrafts: !state.empty,
-          complete: state.empty || state.complete,
+          complete: (state.empty || state.complete) && !state.reference,
           knownPurchaseCost: state.empty ? 0 : 300.75,
           items: state.empty
             ? []
@@ -212,4 +218,38 @@ test('расчёт на телефоне без горизонтального �
       .evaluate((e) => e.getBoundingClientRect().right <= innerWidth),
   ).toBe(true);
   await page.screenshot({ path: 'test-results/estimate-mobile.png', fullPage: true });
+});
+
+test('каталожный ориентир даёт ненулевую оценку и явно отмечен как неподтверждённый', async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  state.reference = true;
+  state.complete = true;
+  await page.goto('/shopping');
+  await choose(page);
+  await expect(
+    page.getByText('Предварительная стоимость с ориентирами', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('300,75', { exact: false }).first()).toBeVisible();
+  await expect(
+    page.getByText('Каталожный ориентир · Тестовый каталог', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Открыть источник', exact: true })).toHaveAttribute(
+    'href',
+    'https://example.invalid/reference',
+  );
+  await expect(page.getByText('Все продукты покрыты', { exact: true })).toHaveCount(0);
+});
+
+test('весовой ориентир в смете показывает цену за килограмм вместо упаковок', async ({ page }) => {
+  const state = await fixture(page);
+  state.reference = true;
+  state.weighted = true;
+  state.complete = true;
+  await page.goto('/shopping');
+  await choose(page);
+  await expect(page.getByText(/1\s?250,55 г · на вес/)).toBeVisible();
+  await expect(page.getByText(/100,25.*\/ кг/)).toBeVisible();
+  await expect(page.getByText('3 уп.', { exact: false })).toHaveCount(0);
 });

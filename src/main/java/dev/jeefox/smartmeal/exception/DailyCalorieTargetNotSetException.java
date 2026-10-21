@@ -2,6 +2,6 @@ package dev.jeefox.smartmeal.exception;
 
 public class DailyCalorieTargetNotSetException extends RuntimeException {
     public DailyCalorieTargetNotSetException() {
-        super("Задайте суточную цель перед подтверждением меню");
+        super("Задайте суточную цель для работы с меню");
     }
 }

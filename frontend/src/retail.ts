@@ -20,6 +20,10 @@ export type ShoppingEstimateItem = {
   remainderG: number | null;
   priceObservedAt: string | null;
   priceSource: string | null;
+  referencePrice?: boolean;
+  referenceSourceUrl?: string | null;
+  referenceSourceName?: string | null;
+  referenceSourceScope?: string | null;
 };
 export type ShoppingEstimate = {
   from: string;

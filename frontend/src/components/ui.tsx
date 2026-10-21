@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   AlertCircle,
@@ -13,6 +13,7 @@ import {
 import { Link } from 'react-router';
 import { ApiError } from '../api';
 import { number } from '../domain';
+import { recipeCover } from '../recipe-covers';
 import type { Nutrition, RecipeSummary } from '../types';
 export function Dialog({
   title,
@@ -175,22 +176,40 @@ export function RecipeImage({
   recipe: RecipeSummary;
   className?: string;
 }) {
+  const cover = recipeCover(recipe);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [cover?.src]);
   return (
     <div className={`recipe-image ${className}`}>
-      {recipe.image ? (
-        <img
-          src={recipe.image}
-          alt={recipe.name}
-          loading="lazy"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
-          }}
-        />
-      ) : null}
-      <ChefHat className="image-fallback" size={42} />
+      {cover && !failed ? (
+        <>
+          <img
+            src={cover.src}
+            srcSet={cover.srcSet}
+            sizes="(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 33vw"
+            width={960}
+            height={720}
+            alt={cover.credit ? `Фото подачи: ${recipe.name}` : recipe.name}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailed(true)}
+          />
+          {cover.credit && (
+            <span
+              className="generated-cover-label"
+              title={`Фото: ${cover.credit.author}, ${cover.credit.license}. Кадр иллюстрирует категорию блюда; состав может отличаться.`}
+            >
+              Фото подачи
+            </span>
+          )}
+        </>
+      ) : (
+        <ChefHat className="image-fallback" size={42} />
+      )}
     </div>
   );
 }
+
 export function NutritionValues({
   nutrition,
   label,

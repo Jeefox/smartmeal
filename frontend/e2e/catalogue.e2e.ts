@@ -4,6 +4,9 @@ test.use({ timezoneId: 'Europe/Moscow' });
 async function fixture(page: Page) {
   const state = {
     listStatus: 200,
+    references: [] as any[],
+    refreshStatus: [] as any[],
+    coverage: [] as any[],
     latestStatus: 200,
     writeStatus: 201,
     offlineWrite: false,
@@ -43,6 +46,10 @@ async function fixture(page: Page) {
       return route.fulfill({
         json: { token: 'csrf-fresh', headerName: 'X-CSRF', parameterName: '_csrf' },
       });
+    if (path === '/api/price-references/status')
+      return route.fulfill({ json: state.refreshStatus });
+    if (path === '/api/price-references/coverage') return route.fulfill({ json: state.coverage });
+    if (path === '/api/price-references') return route.fulfill({ json: state.references });
     if (path === '/api/retail-chains')
       return route.fulfill({ json: [{ id: 42, code: 'API', name: 'Сеть API' }] });
     if (path === '/api/stores')
@@ -365,4 +372,96 @@ test('базовые продукты показывают покупное на
   await page.goto('/products');
   await expect(page.locator('.product-grid')).toContainText('Для покупок: Рис');
   await expect(page.locator('.product-grid')).toContainText('Доля съедобной части: 1');
+});
+
+test('показывает четыре справочные цены с упаковками и источниками отдельно от товаров магазина', async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  state.references = ['Макароны', 'Гречка', 'Картофель', 'Морковь'].map((name, i) => ({
+    id: i + 1,
+    productId: i + 1,
+    productName: name,
+    name: name + ' из каталога',
+    packageWeightG: 500,
+    price: 40 + i,
+    sourceName: 'Тестовый каталог',
+    sourceScope: 'Регион не подтверждён',
+    sourceUrl: 'https://example.invalid/' + i,
+    retrievedAt: '2026-10-20T00:00:00Z',
+    expiresAt: '2026-10-23T00:00:00Z',
+  }));
+  await open(page);
+  const panel = page.getByRole('region', { name: 'Каталожные ориентиры', exact: true });
+  await expect(panel.getByRole('link', { name: 'Источник цены', exact: true })).toHaveCount(4);
+  await expect(panel).toContainText('цена и наличие в вашей точке Тулы не подтверждены');
+  await expect(panel).toContainText('40,00');
+  expect(state.writes).toHaveLength(0);
+});
+
+test('автоматическое покрытие каталога и весовая цена показаны без вымышленных упаковок', async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  state.refreshStatus = [
+    { id: 1, enabled: true, lastSuccessAt: '2026-10-20T10:00:00Z', lastError: null },
+  ];
+  state.coverage = [
+    { productId: 24, productName: 'Морковь', priced: true, lastError: null },
+    { productId: 14, productName: 'Тунец', priced: false, lastError: 'NO_SAFE_PRODUCT_MATCH' },
+  ];
+  state.references = [
+    {
+      id: 200,
+      productId: 24,
+      productName: 'Морковь',
+      name: 'Морковь мытая',
+      packageWeightG: 1000,
+      soldByWeight: true,
+      price: 95,
+      sourceName: 'ВкусВилл',
+      sourceUrl: 'https://vkusvill.ru/goods/morkov-mytaya-18735/',
+      sourceScope: 'Регион не подтверждён',
+      retrievedAt: '2026-10-20T10:00:00Z',
+      expiresAt: '2026-10-23T10:00:00Z',
+    },
+  ];
+  await open(page);
+  const panel = page.getByRole('region', { name: 'Каталожные ориентиры' });
+  await expect(panel).toContainText('1 из 2 продуктов');
+  await expect(panel).toContainText('автоматически раз в сутки');
+  await expect(panel).toContainText('95,00');
+  await expect(panel).toContainText('/ кг');
+  await panel.getByText('Для каких продуктов ещё нет цен').click();
+  await expect(panel).toContainText('Тунец — пока не найден подходящий товар');
+});
+
+test('большой каталог сворачивается, отключённые источники не показывают ложный сбой', async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  state.refreshStatus = [
+    { id: 1, enabled: true, lastSuccessAt: '2026-10-20T10:00:00Z', lastError: null },
+    { id: 2, enabled: false, lastSuccessAt: null, lastError: 'UNSAFE_PRODUCT_MATCH' },
+  ];
+  state.references = Array.from({ length: 10 }, (_, index) => ({
+    id: index + 100,
+    productId: index + 100,
+    productName: `Продукт ${index}`,
+    name: `Товар ${index}`,
+    packageWeightG: 500,
+    price: 50,
+    sourceName: 'Тестовый каталог',
+    sourceUrl: 'https://example.invalid/',
+    sourceScope: 'Регион не подтверждён',
+    retrievedAt: '2026-10-20T10:00:00Z',
+    expiresAt: '2026-10-23T10:00:00Z',
+  }));
+  await open(page);
+  const panel = page.getByRole('region', { name: 'Каталожные ориентиры' });
+  await expect(panel.locator('.catalogue-reference-list > li')).toHaveCount(6);
+  await expect(panel).toContainText('Последние проверки выполнены');
+  await expect(panel).not.toContainText('Часть источников сейчас недоступна');
+  await panel.getByRole('button', { name: 'Показать все 10 продуктов с ценами' }).click();
+  await expect(panel.locator('.catalogue-reference-list > li')).toHaveCount(10);
 });

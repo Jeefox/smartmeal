@@ -190,4 +190,32 @@ public class ApiExceptionHandler {
         detail.setTitle("Запись цены не найдена");
         return detail;
     }
+    @ExceptionHandler(MenuGenerationUnavailableException.class)
+    public ProblemDetail handleMenuGenerationUnavailable(MenuGenerationUnavailableException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Не удалось подобрать меню");
+        return detail;
+    }
+    @ExceptionHandler(InvalidMealPlanSelectionException.class)
+    public ProblemDetail handleInvalidMealPlanSelection(InvalidMealPlanSelectionException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        detail.setTitle("Некорректный выбор блюд");
+        return detail;
+    }
+
+    @ExceptionHandler(StaleMealPlanPreviewException.class)
+    public ProblemDetail handleStaleMealPlanPreview(StaleMealPlanPreviewException exception) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        detail.setTitle("Предпросмотр устарел");
+        return detail;
+    }
+    @ExceptionHandler(InvalidPriceEntryException.class)
+    public ProblemDetail handleInvalidPriceEntry(InvalidPriceEntryException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(PriceEntryConflictException.class)
+    public ProblemDetail handlePriceEntryConflict(PriceEntryConflictException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
 }

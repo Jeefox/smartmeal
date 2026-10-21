@@ -41,10 +41,23 @@ class ShoppingEstimateServiceTest {
         prices = mock(PriceObservationRepository.class);
         shopping = mock(ShoppingListService.class);
         calculator = spy(new PackageCostCalculator());
-        service = new ShoppingEstimateService(stores, packages, prices, shopping, calculator);
+        service = new ShoppingEstimateService(stores, packages, prices, shopping, calculator, mock(dev.jeefox.smartmeal.price.service.CataloguePriceReferenceService.class));
         Store store = mock(Store.class);
         when(store.isActive()).thenReturn(true);
         when(stores.findById(1L)).thenReturn(Optional.of(store));
+    }
+
+    @Test
+    void preparedOffersAreReusedWithoutQueriesForEachMenu() {
+        StoreProduct pack = pack(10L, 1L, 2000);
+        when(packages.findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L))).thenReturn(List.of(pack));
+        price(10L, "40.00");
+        var prepared = service.prepare(1L, List.of(1L));
+        var list = new ShoppingListResponse(date, date, false, List.of(need(1L, "1500")));
+        assertEquals(new BigDecimal("40.00"), prepared.apply(list).knownPurchaseCost());
+        assertEquals(new BigDecimal("40.00"), prepared.apply(list).knownPurchaseCost());
+        verify(prices, times(1)).findFirstByStoreProduct_IdAndPromotionalFalseAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(10L);
+        verify(packages, times(1)).findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L));
     }
 
     @Test

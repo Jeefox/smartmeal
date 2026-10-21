@@ -1,5 +1,6 @@
 package dev.jeefox.smartmeal.recipe.dto;
 
+import dev.jeefox.smartmeal.mealplan.entity.MealType;
 import dev.jeefox.smartmeal.nutrition.dto.NutritionValues;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ public record RecipeResponse(
         NutritionValues nutritionTotal,
         NutritionValues nutritionPerServing,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        List<MealType> mealTypes
 ) {
 }

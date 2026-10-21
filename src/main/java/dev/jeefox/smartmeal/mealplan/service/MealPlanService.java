@@ -45,7 +45,7 @@ public class MealPlanService {
     public MealPlanResponse create(
             String email, CreateMealPlanRequest request
     ){
-        User user = userRepository.findByEmail(email).orElseThrow(()->
+        User user = userRepository.findByEmailForUpdate(email).orElseThrow(()->
                 new UsernameNotFoundException(email));
         final LocalDate planDate = request.planDate();
         mealPlanRepository.findByUser_IdAndPlanDate(user.getId(), planDate).ifPresent(

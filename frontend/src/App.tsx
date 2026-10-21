@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   CalendarDays,
   ChefHat,
@@ -21,11 +21,12 @@ import { useApp, useOnline } from './state';
 import { Catalog, RecipeDetail, Products } from './pages/Recipes';
 import RecipeEditor from './pages/RecipeEditor';
 import Planner from './pages/Planner';
-import Shopping from './pages/Shopping';
 import { ProfilePage, StoresPage, AuthPage, Onboarding } from './pages/Settings';
-import { Empty } from './components/ui';
+import { Empty, Loading } from './components/ui';
 import { RequireSession, useSession } from './session';
 import { Welcome } from './pages/Account';
+const MenuPreviewPage = lazy(() => import('./pages/MenuPreview'));
+const Shopping = lazy(() => import('./pages/Shopping'));
 const mainNavigation = [
   { to: '/', label: 'Сегодня', icon: LayoutDashboard },
   { to: '/week', label: 'Меню недели', icon: CalendarDays },
@@ -52,6 +53,7 @@ export default function App() {
     [...mainNavigation, ...secondaryNavigation].find((item) => item.to === location.pathname)
       ?.label ||
     {
+      '/menu-preview': 'Подбор меню',
       '/login': 'Вход',
       '/register': 'Регистрация',
       '/onboarding': 'Опрос',
@@ -202,8 +204,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <span>API</span>Реальные продукты, рецепты и профиль. Остальные модули подключаются по
-              мере готовности бэкенда.
+              <span>API</span>Ваш аккаунт, меню и покупки связаны с сервером.
             </>
           )}
         </div>
@@ -229,12 +230,27 @@ export default function App() {
               <Route path="/welcome" element={<Welcome />} />
               <Route path="/" element={<Planner />} />
               <Route path="/week" element={<Planner week />} />
+              <Route
+                path="/menu-preview"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <MenuPreviewPage />
+                  </Suspense>
+                }
+              />
               <Route path="/recipes" element={<Catalog />} />
               <Route path="/recipes/new" element={<RecipeEditor />} />
               <Route path="/recipes/:id/edit" element={<RecipeEditor />} />
               <Route path="/recipes/:id" element={<RecipeDetail />} />
               <Route path="/products" element={<Products />} />
-              <Route path="/shopping" element={<Shopping />} />
+              <Route
+                path="/shopping"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <Shopping />
+                  </Suspense>
+                }
+              />
               <Route path="/stores" element={<StoresPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/onboarding" element={<Onboarding />} />

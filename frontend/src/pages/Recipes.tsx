@@ -10,7 +10,6 @@ import {
   Heart,
   Plus,
   Search,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { api } from '../api';
@@ -73,7 +72,8 @@ export function Catalog() {
   const time = params.get('maxTime') || '';
   const sort = params.get('sort') || 'createdAt,desc';
   const favoriteOnly = params.get('favorites') === 'true';
-  const query = new URLSearchParams({ q: debounced, page: String(page), size: '9', sort });
+  const query = new URLSearchParams({ q: debounced, page: String(page), size: '12', sort });
+  query.append('sort', 'id,asc');
 
   const response = useQuery({
     queryKey: ['recipes', mode, query.toString()],
@@ -104,9 +104,9 @@ export function Catalog() {
           : 0,
     );
   const list =
-    mode === 'demo' ? filtered.slice(page * 9, page * 9 + 9) : response.data?.content || [];
+    mode === 'demo' ? filtered.slice(page * 12, page * 12 + 12) : response.data?.content || [];
   const total = mode === 'demo' ? filtered.length : response.data?.totalElements || 0;
-  const pages = mode === 'demo' ? Math.ceil(filtered.length / 9) : response.data?.totalPages || 0;
+  const pages = mode === 'demo' ? Math.ceil(filtered.length / 12) : response.data?.totalPages || 0;
   return (
     <>
       <PageHeading
@@ -120,31 +120,6 @@ export function Catalog() {
           </Link>
         }
       />
-      <section className="catalog-hero">
-        <div>
-          <span className="eyebrow">ПРОСТО. ВКУСНО. ПО ПЛАНУ.</span>
-          <h2>
-            Хорошая еда начинается
-            <br />с маленькой идеи.
-          </h2>
-          <p>
-            Соберите свою книгу рецептов
-            <br />и добавляйте любимое в меню.
-          </p>
-        </div>
-        <RecipeImage
-          recipe={{
-            id: 'hero',
-            name: 'Овощной боул',
-            description: '',
-            servings: 2,
-            preparationTimeMin: 25,
-            image:
-              'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1100&q=85',
-          }}
-        />
-        <span className="hero-leaf">✳</span>
-      </section>
       <div className="section-title">
         <h2>
           Каталог рецептов <span className="count">{total}</span>
@@ -170,21 +145,17 @@ export function Catalog() {
             onChange={(event) => update('q', event.target.value)}
           />
         </label>
-        <label className="select-field">
-          <span className="sr-only">Время приготовления</span>
-          <select
-            disabled={mode === 'api'}
-            value={mode === 'api' ? '' : time}
-            onChange={(event) => update('maxTime', event.target.value)}
-          >
-            <option value="">
-              {mode === 'api' ? 'Фильтр времени ожидает API' : 'Любое время'}
-            </option>
-            <option value="15">До 15 минут</option>
-            <option value="30">До 30 минут</option>
-            <option value="60">До часа</option>
-          </select>
-        </label>
+        {mode === 'demo' && (
+          <label className="select-field">
+            <span className="sr-only">Время приготовления</span>
+            <select value={time} onChange={(event) => update('maxTime', event.target.value)}>
+              <option value="">Любое время</option>
+              <option value="15">До 15 минут</option>
+              <option value="30">До 30 минут</option>
+              <option value="60">До часа</option>
+            </select>
+          </label>
+        )}
         <label className="select-field">
           <span className="sr-only">Сортировка</span>
           <select value={sort} onChange={(event) => update('sort', event.target.value)}>
@@ -207,12 +178,7 @@ export function Catalog() {
             </button>
           ))}
         </div>
-      ) : (
-        <p className="caption">
-          <SlidersHorizontal size={14} />
-          Фильтры времени, категорий и ограничений подключатся после расширения API.
-        </p>
-      )}
+      ) : null}
       {mode === 'api' && response.isPending ? (
         <Loading />
       ) : response.isError ? (
@@ -254,16 +220,24 @@ export function Catalog() {
             </button>
           }
         >
-          Попробуйте другой запрос или добавьте собственный рецепт.
+          {page > 0
+            ? 'На этой странице больше нет рецептов. Вернитесь к началу каталога.'
+            : 'Попробуйте другой запрос или добавьте собственный рецепт.'}
         </Empty>
       )}
-      <Pager page={page} pages={pages} onChange={(next) => update('page', String(next))} />
-      <div className="list-footer">
-        {total > 0
-          ? `Показано ${list.length} из ${total} рецептов`
-          : 'Ваш следующий любимый рецепт ещё впереди'}
-        <span>Вкусное начинается с простого ✳</span>
-      </div>
+      <Pager
+        page={page}
+        pages={pages}
+        onChange={(next) => {
+          update('page', String(next));
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }}
+      />
+      {list.length > 0 && (
+        <p className="caption catalog-range">
+          Показаны {page * 12 + 1}–{Math.min((page + 1) * 12, total)} из {total} рецептов
+        </p>
+      )}
     </>
   );
 }

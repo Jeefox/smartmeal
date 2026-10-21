@@ -1,13 +1,19 @@
 package dev.jeefox.smartmeal.recipe.controller;
 
+import dev.jeefox.smartmeal.mealplan.entity.MealType;
 import dev.jeefox.smartmeal.recipe.dto.CreateRecipeRequest;
 import dev.jeefox.smartmeal.recipe.dto.RecipePageResponse;
 import dev.jeefox.smartmeal.recipe.dto.RecipeResponse;
 import dev.jeefox.smartmeal.recipe.dto.RecipeSummaryResponse;
+import dev.jeefox.smartmeal.recipe.dto.UpdateRecipeMealTypesRequest;
 import dev.jeefox.smartmeal.recipe.service.RecipeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +38,23 @@ public class RecipeController {
 
         URI location = URI.create("/api/recipes/"+recipeResponse.id());
         return ResponseEntity.created(location).body(recipeResponse);
+    }
+
+    @PutMapping("/{id}/meal-types")
+    public RecipeSummaryResponse changeMealTypes(@PathVariable("id") UUID id,
+                                                @Valid @RequestBody UpdateRecipeMealTypesRequest request) {
+        return recipeService.changeMealTypes(id, request);
+    }
+
+    @GetMapping("/candidates")
+    public RecipePageResponse findCandidates(
+            @RequestParam("mealType") MealType mealType,
+            @RequestParam("maxPreparationTimeMin") @Min(0) int maxPreparationTimeMin,
+            @RequestParam(name = "q", required = false) String name,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
+        return new RecipePageResponse(recipeService.findCandidates(mealType, maxPreparationTimeMin, name,
+                PageRequest.of(page, size, Sort.by("name", "id"))));
     }
 
     @GetMapping("/{id}")

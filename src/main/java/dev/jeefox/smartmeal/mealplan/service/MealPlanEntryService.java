@@ -7,9 +7,8 @@ import dev.jeefox.smartmeal.mealplan.dto.UpdateMealPlanEntryRequest;
 import dev.jeefox.smartmeal.mealplan.entity.*;
 import dev.jeefox.smartmeal.mealplan.repository.MealPlanEntryRepository;
 import dev.jeefox.smartmeal.mealplan.repository.MealPlanRepository;
-import dev.jeefox.smartmeal.mealplan.snapshot.RecipeIngredientSnapshot;
 import dev.jeefox.smartmeal.mealplan.snapshot.RecipeSnapshot;
-import dev.jeefox.smartmeal.nutrition.NutritionCalculator;
+import dev.jeefox.smartmeal.mealplan.snapshot.RecipeSnapshotFactory;
 import dev.jeefox.smartmeal.recipe.entity.Recipe;
 import dev.jeefox.smartmeal.recipe.entity.RecipeIngredient;
 import dev.jeefox.smartmeal.recipe.repository.RecipeIngredientRepository;
@@ -42,13 +41,7 @@ public class MealPlanEntryService {
         Recipe recipe = recipes.findById(request.recipeId())
                 .orElseThrow(() -> new RecipeNotFoundException(request.recipeId()));
         List<RecipeIngredient> recipeIngredients = ingredients.findByRecipe_IdOrderByPositionAsc(recipe.getId());
-        RecipeSnapshot snapshot = new RecipeSnapshot(recipe.getId(), recipe.getName(), recipe.getDescription(),
-                recipe.getInstructions(), recipe.getPreparationTimeMin(), recipe.getServings(),
-                recipeIngredients.stream().map(item -> new RecipeIngredientSnapshot(
-                        item.getProduct().getId(), item.getProduct().getName(), item.getQuantityG(),
-                        item.getProduct().getShoppingName(), item.getProduct().getEdibleYield())).toList(),
-                NutritionCalculator.calculateTotals(recipeIngredients),
-                NutritionCalculator.calculatePortion(recipeIngredients, recipe.getServings()));
+        RecipeSnapshot snapshot = RecipeSnapshotFactory.create(recipe, recipeIngredients);
         int position = entries.findFirstByMealPlan_IdAndMealTypeOrderByPositionDesc(planId, request.mealType())
                 .map(entry -> Math.addExact(entry.getPosition(), 1)).orElse(1);
         MealPlanEntry saved = entries.save(new MealPlanEntry(plan, recipe, request.mealType(),

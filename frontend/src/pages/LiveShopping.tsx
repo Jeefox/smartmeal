@@ -43,7 +43,9 @@ export default function LiveShopping() {
     const next = periodErrors(draftFrom, draftTo);
     setErrors(next);
     if (Object.keys(next).length) return;
-    const nextParams = new URLSearchParams({ from: draftFrom, to: draftTo });
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('from', draftFrom);
+    nextParams.set('to', draftTo);
     setParams(nextParams);
     if (draftFrom === from && draftTo === to) query.refetch();
   }
@@ -51,7 +53,10 @@ export default function LiveShopping() {
     setFrom(start);
     setTo(end);
     setErrors({});
-    setParams({ from: start, to: end });
+    const next = new URLSearchParams(params);
+    next.set('from', start);
+    next.set('to', end);
+    setParams(next);
   }
   const visibleErrors = Object.keys(errors).length ? errors : invalid;
   return (

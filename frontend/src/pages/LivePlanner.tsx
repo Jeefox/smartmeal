@@ -180,16 +180,21 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
         description={
           week
             ? 'Выберите день недели. Каждый день хранится и подтверждается отдельно.'
-            : 'Соберите меню вручную — порции и питание рассчитает сервер.'
+            : 'Соберите меню вручную или начните с серверного предпросмотра дня.'
         }
         actions={
-          <div className="segmented">
-            <Link to={`/?date=${selectedDate}`} className={!week ? 'active' : ''}>
-              День
+          <div className="preview-planner-actions">
+            <Link className="button primary" to={`/menu-preview?date=${selectedDate}`}>
+              Подобрать меню
             </Link>
-            <Link to={`/week?date=${selectedDate}`} className={week ? 'active' : ''}>
-              Неделя
-            </Link>
+            <div className="segmented">
+              <Link to={`/?date=${selectedDate}`} className={!week ? 'active' : ''}>
+                День
+              </Link>
+              <Link to={`/week?date=${selectedDate}`} className={week ? 'active' : ''}>
+                Неделя
+              </Link>
+            </div>
           </div>
         }
       />
@@ -476,8 +481,9 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
             ))}
           </div>
           <Notice>
-            Автоподбор, замены и закрепление отдельных блюд пока не поддерживаются API. Это ручное
-            меню. Подтверждение фиксирует день, но не означает соблюдение бюджета.
+            Предпросмотр подбирает новый день и сохраняет его отдельным черновиком. Замены и
+            закрепление отдельных блюд пока не поддерживаются API. Подтверждение фиксирует день, но
+            не означает соблюдение бюджета.
           </Notice>
         </>
       ) : null}

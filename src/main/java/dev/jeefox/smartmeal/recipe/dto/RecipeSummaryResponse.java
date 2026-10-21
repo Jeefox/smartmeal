@@ -1,5 +1,8 @@
 package dev.jeefox.smartmeal.recipe.dto;
 
+import dev.jeefox.smartmeal.mealplan.entity.MealType;
+
+import java.util.List;
 import java.util.UUID;
 
 public record RecipeSummaryResponse(
@@ -11,6 +14,7 @@ public record RecipeSummaryResponse(
 
         Integer preparationTimeMin,
 
-        Integer servings
+        Integer servings,
+        List<MealType> mealTypes
 ) {
 }

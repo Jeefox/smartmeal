@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { readCity, saveCity } from '../store-preferences';
 import { MapPin, RefreshCw, Store as StoreIcon } from 'lucide-react';
 import { ApiError } from '../api';
 import { estimateErrorTitle, estimateKey, retailApi } from '../retail';
@@ -24,15 +25,33 @@ export default function ShoppingEstimate({
 }) {
   const userId = useSession().profile!.userId;
   const online = useOnline();
-  const [cityInput, setCityInput] = useState('');
-  const [city, setCity] = useState('');
-  const [chain, setChain] = useState('');
-  const [selected, setSelected] = useState<Store | null>(null);
-  const [cityError, setCityError] = useState('');
-  const [params] = useSearchParams();
-  const [mode, setMode] = useState<'single' | 'comparison' | 'catalogue'>(() =>
-    params.get('view') === 'catalogue' ? 'catalogue' : 'single',
+  const client = useQueryClient();
+  const preferenceKey = ['store-preferences', userId];
+  const remembered = client.getQueryData<{ city: string; chain: string; store: Store | null }>(
+    preferenceKey,
   );
+  const [cityInput, setCityInput] = useState(readCity);
+  const [city, setCity] = useState(readCity);
+  const [editingCity, setEditingCity] = useState(() => !readCity());
+  const [chain, setChain] = useState(() =>
+    remembered?.city === readCity() ? remembered.chain : '',
+  );
+  const [selected, setSelected] = useState<Store | null>(() =>
+    remembered?.city === readCity() ? remembered.store : null,
+  );
+  useEffect(() => {
+    client.setQueryData(['store-preferences', userId], { city, chain, store: selected });
+  }, [client, userId, city, chain, selected]);
+  const [cityError, setCityError] = useState('');
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view');
+  const mode = view === 'catalogue' || view === 'comparison' ? view : 'single';
+  function setMode(value: 'single' | 'comparison' | 'catalogue') {
+    const next = new URLSearchParams(params);
+    if (value === 'single') next.delete('view');
+    else next.set('view', value);
+    setParams(next);
+  }
   const chains = useQuery({
     queryKey: ['retail-chains', userId],
     queryFn: ({ signal }) => retailApi.chains(signal),
@@ -45,6 +64,12 @@ export default function ShoppingEstimate({
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+  useEffect(() => {
+    if (stores.isSuccess && !stores.isFetching && selected) {
+      const current = stores.data.find((store) => store.id === selected.id);
+      if (current !== selected) setSelected(current ?? null);
+    }
+  }, [stores.data, stores.isSuccess, stores.isFetching, selected]);
   const estimate = useQuery({
     queryKey: estimateKey(userId, from, to, selected?.id ?? null),
     queryFn: ({ signal }) => retailApi.estimate(from, to, selected!.id, signal),
@@ -55,13 +80,15 @@ export default function ShoppingEstimate({
   });
   function find(event: FormEvent) {
     event.preventDefault();
-    if (!cityInput.trim()) {
-      setCityError('Введите город.');
+    if (!cityInput.trim() || cityInput.trim().length > 120) {
+      setCityError('Введите название города, не более 120 символов.');
       return;
     }
     setCityError('');
     setSelected(null);
     setCity(cityInput.trim());
+    saveCity(cityInput);
+    setEditingCity(false);
     if (cityInput.trim() === city) stores.refetch();
   }
   const data = estimate.data;
@@ -100,22 +127,41 @@ export default function ShoppingEstimate({
           Упаковки и цены
         </button>
       </div>
-      <form className="store-search" onSubmit={find} noValidate>
-        <label>
-          <span>Город</span>
-          <input
-            value={cityInput}
-            onChange={(e) => setCityInput(e.target.value)}
-            placeholder="Введите ваш город"
-            aria-invalid={Boolean(cityError)}
-            aria-describedby={cityError ? 'store-city-error' : undefined}
-          />
-          {cityError && (
-            <span id="store-city-error" className="field-error" role="alert">
-              {cityError}
-            </span>
-          )}
-        </label>
+      {!editingCity && city && (
+        <div className="location-summary">
+          <MapPin size={22} />
+          <div>
+            <span className="eyebrow">ВАШ ГОРОД</span>
+            <strong>{city}</strong>
+            <small>Запомнили на этом устройстве</small>
+          </div>
+          <button className="button quiet" onClick={() => setEditingCity(true)}>
+            Изменить город
+          </button>
+        </div>
+      )}
+      <form
+        className={`store-search ${editingCity ? '' : 'city-saved'}`}
+        onSubmit={find}
+        noValidate
+      >
+        {editingCity && (
+          <label>
+            <span>Город</span>
+            <input
+              value={cityInput}
+              onChange={(e) => setCityInput(e.target.value)}
+              placeholder="Введите ваш город"
+              aria-invalid={Boolean(cityError)}
+              aria-describedby={cityError ? 'store-city-error' : undefined}
+            />
+            {cityError && (
+              <span id="store-city-error" className="field-error" role="alert">
+                {cityError}
+              </span>
+            )}
+          </label>
+        )}
         <label>
           <span>Торговая сеть</span>
           <select
@@ -133,10 +179,12 @@ export default function ShoppingEstimate({
             ))}
           </select>
         </label>
-        <button className="button primary" type="submit" disabled={!online}>
-          <MapPin size={17} />
-          Найти магазины
-        </button>
+        {editingCity && (
+          <button className="button primary" type="submit" disabled={!online}>
+            <MapPin size={17} />
+            Найти магазины
+          </button>
+        )}
       </form>
       {chains.isError && (
         <Notice tone="warning">

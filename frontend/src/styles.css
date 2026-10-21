@@ -4531,3 +4531,331 @@ footer > span:last-child {
     padding: 10px;
   }
 }
+
+.preview-planner-actions,
+.preview-generate-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.menu-preview-options {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.preview-options-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.preview-options-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.preview-options-grid input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.menu-preview-result {
+  margin: 28px 0;
+  min-width: 0;
+}
+.menu-preview-result > .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.preview-meal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.preview-meal {
+  padding: 22px;
+  min-width: 0;
+}
+.preview-meal h3 {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+  margin: 16px 0;
+}
+.preview-meal .nutrition-values {
+  gap: 8px;
+}
+.preview-meal .recipe-meta {
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.preview-day-total {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 24px;
+}
+.preview-deviation {
+  background: #edf4e9;
+  padding: 20px;
+  border-radius: 14px;
+  min-width: 0;
+}
+.preview-deviation strong {
+  display: block;
+  font-size: 28px;
+  color: #345b43;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.preview-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+  margin-top: 20px;
+}
+.preview-save h3 {
+  margin-top: 0;
+}
+.preview-save p {
+  line-height: 1.6;
+}
+.preview-save .button {
+  flex-shrink: 0;
+}
+.preview-scope {
+  margin: 24px 0;
+  line-height: 1.7;
+}
+@media (max-width: 1100px) {
+  .preview-options-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .preview-meal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preview-save {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+@media (max-width: 600px) {
+  .menu-preview-options,
+  .preview-meal,
+  .preview-day-total,
+  .preview-save {
+    padding: 16px;
+  }
+  .preview-options-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preview-day-total {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preview-planner-actions .button {
+    width: 100%;
+  }
+  .preview-deviation strong {
+    font-size: 25px;
+  }
+  .preview-save .button {
+    white-space: normal;
+  }
+}
+
+/* Quick price entry: one form for several real observations, usable on a phone. */
+.quick-price-entry {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+.quick-price-entry fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.quick-price-controls {
+  display: grid;
+  gap: 14px;
+}
+.quick-price-paste {
+  padding: 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 16px;
+}
+.quick-price-paste summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.quick-price-rows {
+  display: grid;
+  gap: 12px;
+}
+.quick-price-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+}
+.quick-price-row > div:first-child,
+.quick-price-row > p {
+  grid-column: 1 / -1;
+}
+.quick-price-row h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.quick-price-save {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 16px;
+  padding: 14px;
+  z-index: 2;
+  box-shadow: 0 5px 22px #0000000d;
+}
+@media (max-width: 600px) {
+  .quick-price-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+  .quick-price-save {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 82px;
+  }
+  .quick-price-save p {
+    margin: 0;
+  }
+}
+
+.catalogue-reference-panel {
+  margin: 18px 0;
+}
+.catalogue-reference-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.catalogue-reference-list li {
+  padding: 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 14px;
+  min-width: 0;
+}
+.catalogue-reference-list p {
+  margin: 6px 0;
+}
+@media (max-width: 600px) {
+  .catalogue-reference-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.location-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #f1f5eb;
+  border-radius: 14px;
+  padding: 16px;
+  margin: 18px 0;
+}
+.location-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.location-summary strong {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.location-summary small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.location-summary > .button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.store-search.city-saved {
+  grid-template-columns: minmax(0, 360px);
+  margin-bottom: 20px;
+}
+.generated-cover-label {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 2;
+  background: #fffffff0;
+  border: 1px solid #fff8;
+  backdrop-filter: blur(6px);
+  border-radius: 30px;
+  padding: 5px 9px;
+  font-size: 10px;
+  color: #52604e;
+  pointer-events: none;
+}
+.recipe-card .recipe-image {
+  aspect-ratio: 4/3;
+}
+.recipe-card-body > p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.catalog-range {
+  text-align: center;
+  margin-top: 16px;
+}
+.recipe-grid {
+  align-items: stretch;
+}
+.recipe-card {
+  display: flex;
+  flex-direction: column;
+}
+.recipe-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.recipe-card-body .recipe-card-bottom {
+  margin-top: auto;
+}
+@media (max-width: 600px) {
+  .location-summary {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+  .location-summary > .button {
+    margin-left: 0;
+  }
+  .store-search.city-saved {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .generated-cover-label {
+    font-size: 9px;
+    bottom: 8px;
+    left: 8px;
+  }
+}

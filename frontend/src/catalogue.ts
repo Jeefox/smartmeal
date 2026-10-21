@@ -108,6 +108,7 @@ export async function invalidateRetail(
     ...(skuId == null
       ? []
       : [client.invalidateQueries({ queryKey: latestPriceKey(userId, skuId) })]),
+    client.invalidateQueries({ queryKey: ['price-entry', userId, storeId] }),
     client.invalidateQueries({ queryKey: ['shopping-estimate', userId] }),
     client.invalidateQueries({ queryKey: ['shopping-comparison', userId] }),
   ]);

@@ -1,0 +1,88 @@
+// Curated serving photographs from Wikimedia Commons. They illustrate a dish category,
+// while the attribution and license for every local asset live next to the files.
+import type { RecipeSummary } from './types';
+
+const coverCredits: Record<string, { author: string; license: string }> = {
+  omelette: { author: 'Tom K (JacquesDemien)', license: 'CC0 1.0' },
+  porridge: { author: 'Shisma', license: 'CC BY 4.0' },
+  pasta: { author: 'Luca Nebuloni', license: 'CC BY 2.0' },
+  soup: { author: 'Daderot', license: 'CC0 1.0' },
+  'chicken-rice': { author: 'David (Kcdtsg)', license: 'Public domain' },
+  salad: { author: 'Делфина', license: 'CC0 1.0' },
+  fish: { author: 'Benreis', license: 'CC BY 3.0' },
+  buckwheat: { author: 'Baydastann', license: 'CC0 1.0' },
+  beans: { author: 'Badagnani', license: 'CC BY 3.0' },
+  curd: { author: 'Fastily', license: 'CC BY-SA 3.0' },
+};
+const covers: Record<string, string> = {
+  '2750a9ec-958d-45b5-8136-636fa0091bc2': 'porridge',
+  '6bdda04b-2fd7-4a88-a156-9c72a044463d': 'porridge',
+  'd62015b4-e51c-47fd-b126-aab68b1a7fb0': 'curd',
+  '38c4e8f3-1a5c-4f5d-84a4-fc6408404eec': 'curd',
+  '004104f2-ebe9-4eb4-b93f-6e5e363783bf': 'omelette',
+  'c1c47e20-3c5f-4407-ad40-d6272389de41': 'omelette',
+  '95c026de-6777-473d-9f28-64e2358a2daa': 'buckwheat',
+  'f4f7006e-a7f9-434e-a8d2-fd6aed7ed32e': 'chicken-rice',
+  'd7997bcd-a044-48aa-8490-31a689f2b5f5': 'pasta',
+  '7b8b0d81-7cd7-4f88-a3c7-06732d748dc3': 'fish',
+  'bba38b69-0f99-4334-bfac-9260cdbc6a12': 'soup',
+  '86b85555-e82a-4320-81a4-9a6c8426f7ee': 'salad',
+  '318c003b-f1f2-4ab1-bab8-68e2ec33bf78': 'salad',
+  '0f360707-1d42-42cd-b7bf-f56724ee8c56': 'chicken-rice',
+  '0be6b6c1-26fc-42d9-a99f-2daff709d2bd': 'buckwheat',
+  '67112f45-0e89-4448-bb5a-09fcdcd446b3': 'curd',
+  '4535584e-53f7-46a1-8000-416eb3ea06bc': 'beans',
+  'b9a40afa-d3f0-4887-a5fe-d292fec2fc8b': 'pasta',
+  '3b4bebd6-8eb5-49a8-8a0f-93fc92cdcbc8': 'curd',
+  '50356658-edb0-4bda-9e54-d277ab3c475b': 'soup',
+  '1eabb49c-184b-44f0-a890-e175b3c0f3e6': 'beans',
+  '6365a99d-bbd5-4cdf-95d3-c5c894029ed8': 'salad',
+  '1eb55deb-2b9e-50be-a46c-e5cbb032c585': 'omelette',
+  '82166414-8135-55ab-924a-122ea64efa83': 'porridge',
+  'b81cacb5-afcf-5b23-9356-63659f6da6c6': 'omelette',
+  '61e06880-8814-516d-aa82-d3e77debefad': 'porridge',
+  '697b3fa8-9d2c-5feb-91cd-08cd1ccc12f0': 'soup',
+  '99a4ce51-f4cc-5ab6-abed-7024cb6a78fc': 'beans',
+  'bdab55be-66d2-510b-bfe2-805465756475': 'chicken-rice',
+  '796ebf2b-3bf0-547c-93e0-fa534a6c518d': 'pasta',
+  'cac1c37e-eebb-503f-a82a-0194893db0a9': 'pasta',
+  '2181dab3-bda2-584c-85e2-4d0756df36c7': 'fish',
+  'fcfaaf3d-6eee-5066-ad70-ff1328178cb7': 'pasta',
+  'f9d8520a-8c41-5f8e-8224-0d28b3b22c4c': 'omelette',
+  '045e89c3-1a79-5526-816a-b7002620763d': 'porridge',
+  'e0685669-c4df-5732-98fe-d39459854818': 'curd',
+  '634179d1-e5f1-5c49-9626-2a58f9f0e277': 'curd',
+  '9d3e8eab-d2bf-5e8c-a509-f8cbb6e393c6': 'omelette',
+  '04719bba-bf9c-5cae-96b7-6d9d56e947f1': 'buckwheat',
+  '652acf18-711d-5d57-baa7-168a780d1bfc': 'soup',
+  '76bc78f3-6a9e-54a2-ad80-304a08cf73a1': 'soup',
+  '8899a7f6-6b18-54ec-b43a-c185c5394077': 'soup',
+  '29696788-4f11-5cd1-8830-9ddbdc76b7d0': 'buckwheat',
+  '0466b164-0c36-5915-a1da-1f96dde08c09': 'pasta',
+  '039b1b56-15f8-5772-93ea-2cec9638801b': 'chicken-rice',
+  '41e014c5-f7d5-5667-9fc0-851199f702ff': 'fish',
+  '3de32ea3-83fb-5176-bba7-7dc1a8d62af8': 'chicken-rice',
+  '1b230c93-3599-5a46-b786-1d36e9783be6': 'buckwheat',
+  '7c1fb700-b830-55df-b0ac-2a8229e36fe5': 'beans',
+  'ec5f78df-e2dd-559d-bf2f-c1ba31a3ce50': 'beans',
+  '5ca8b421-654e-55ad-9253-65b55a73d907': 'omelette',
+  '9d7de2cc-7fd6-5ef9-a877-dcf002336376': 'curd',
+  'effc6f0e-b3f8-56e2-847a-fede4c939229': 'porridge',
+  'acbf0060-359f-5e19-8b28-699669712e3f': 'salad',
+  '17791123-05ae-526b-ae59-65bd27fb01bf': 'salad',
+  '10ada676-78b3-5be9-9b0c-c24f86599186': 'salad',
+  '9ac4cca8-d69c-587c-9c10-623b4f6830a7': 'omelette',
+};
+export function recipeCover(recipe: Pick<RecipeSummary, 'id' | 'image'>) {
+  if (recipe.image)
+    return { src: recipe.image, srcSet: undefined, generated: false, credit: undefined };
+  const key = covers[recipe.id];
+  return key
+    ? {
+        src: `/images/recipes/${key}-960.webp`,
+        srcSet: `/images/recipes/${key}-480.webp 480w, /images/recipes/${key}-960.webp 960w`,
+        generated: false,
+        credit: coverCredits[key],
+      }
+    : null;
+}

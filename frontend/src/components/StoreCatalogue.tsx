@@ -8,6 +8,8 @@ import { useOnline } from '../state';
 import { ErrorState, Loading, Notice } from './ui';
 import CreateStoreProduct from './CreateStoreProduct';
 import PriceCard from './PriceCard';
+import QuickPriceEntry from './QuickPriceEntry';
+import CataloguePriceReferences from './CataloguePriceReferences';
 export default function StoreCatalogue({ store }: { store: Store }) {
   const user = useSession().profile!.userId,
     online = useOnline();
@@ -17,6 +19,7 @@ export default function StoreCatalogue({ store }: { store: Store }) {
     [selected, setSelected] = useState<StoreProduct | null>(null),
     [creating, setCreating] = useState(false),
     [created, setCreated] = useState(false);
+  const [quickEntry, setQuickEntry] = useState(false);
   const query = useQuery({
     queryKey: catalogueKey(user, store.id, name, page),
     queryFn: ({ signal }) => catalogueApi.list(store.id, name, page, signal),
@@ -28,6 +31,19 @@ export default function StoreCatalogue({ store }: { store: Store }) {
     setCreating(false);
     setCreated(false);
   }
+  if (quickEntry)
+    return (
+      <section className="store-catalogue">
+        <p>
+          {store.chainName} · {store.address}
+        </p>
+        <button className="button quiet" onClick={() => setQuickEntry(false)}>
+          Вернуться к упаковкам
+        </button>
+        <CataloguePriceReferences />
+        <QuickPriceEntry storeId={store.id} />
+      </section>
+    );
   return (
     <section className="store-catalogue" aria-label="Каталог упаковок магазина">
       <div className="section-heading">
@@ -46,12 +62,24 @@ export default function StoreCatalogue({ store }: { store: Store }) {
           Обновить каталог
         </button>
       </div>
+      <CataloguePriceReferences />
       {!online && (
         <Notice tone="warning">
           Нет сети. Полученный каталог может быть устаревшим, создание упаковок и запись цен
           недоступны.
         </Notice>
       )}
+      <div className="sku-create-invite">
+        <div>
+          <h3>Нужно заполнить сразу несколько цен?</h3>
+          <p>
+            Продукты уже собраны из рецептов. Введите известные цены и сохраните одним действием.
+          </p>
+        </div>
+        <button className="button primary" onClick={() => setQuickEntry(true)}>
+          Быстро заполнить цены
+        </button>
+      </div>
       <form
         className="sku-search"
         onSubmit={(e) => {

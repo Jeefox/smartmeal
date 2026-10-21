@@ -3,6 +3,7 @@ package dev.jeefox.smartmeal.recipe.service;
 import dev.jeefox.smartmeal.exception.DuplicateRecipeProductsException;
 import dev.jeefox.smartmeal.exception.ProductNotFoundException;
 import dev.jeefox.smartmeal.exception.RecipeNotFoundException;
+import dev.jeefox.smartmeal.mealplan.entity.MealType;
 import dev.jeefox.smartmeal.nutrition.NutritionCalculator;
 import dev.jeefox.smartmeal.nutrition.dto.NutritionValues;
 import dev.jeefox.smartmeal.product.entity.Product;
@@ -59,6 +60,7 @@ public class RecipeService {
 
         Recipe recipe = new Recipe(request.name(), request.description(),
                 request.instructions(), request.preparationTimeMin(), request.servings());
+        recipe.changeMealTypes(request.mealTypes());
 
         List<RecipeIngredient> ingredients = new ArrayList<>();
 
@@ -108,9 +110,28 @@ public class RecipeService {
         } else {
             recipes = recipeRepository.findAll(pageable);
         }
-        return recipes.map(recipe -> new RecipeSummaryResponse(recipe.getId(),
-                recipe.getName(), recipe.getDescription(),
-                recipe.getPreparationTimeMin(), recipe.getServings()));
+        return recipes.map(RecipeService::recipeToSummary);
+    }
+
+    @Transactional
+    public RecipeSummaryResponse changeMealTypes(UUID id, UpdateRecipeMealTypesRequest request) {
+        Recipe recipe = recipeRepository.findById(id).orElseThrow(() -> new RecipeNotFoundException(id));
+        recipe.changeMealTypes(request.mealTypes());
+        return recipeToSummary(recipe);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RecipeSummaryResponse> findCandidates(MealType mealType, int maxPreparationTimeMin,
+                                                       String name, Pageable pageable) {
+        String pattern = name == null || name.isBlank() ? null
+                : "%" + name.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        return recipeRepository.findCandidates(mealType, maxPreparationTimeMin, pattern, pageable)
+                .map(RecipeService::recipeToSummary);
+    }
+
+    private static RecipeSummaryResponse recipeToSummary(Recipe recipe) {
+        return new RecipeSummaryResponse(recipe.getId(), recipe.getName(), recipe.getDescription(),
+                recipe.getPreparationTimeMin(), recipe.getServings(), recipe.getMealTypes().stream().sorted().toList());
     }
 
     private RecipeResponse recipeToResponse(
@@ -135,7 +156,8 @@ public class RecipeService {
                 nutritionTotal,
                 nutritionPerServing,
                 recipe.getCreatedAt(),
-                recipe.getUpdatedAt()
+                recipe.getUpdatedAt(),
+                recipe.getMealTypes().stream().sorted().toList()
         );
     }
 

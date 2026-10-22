@@ -4,7 +4,13 @@ export type ShoppingNeeds = {
   from: string;
   to: string;
   containsDrafts: boolean;
-  items: { productId: number; productName: string; quantityG: number }[];
+  items: {
+    productId: number;
+    productName: string;
+    quantityG: number;
+    requiredG?: number;
+    fromPantryG?: number;
+  }[];
 };
 export const shoppingKey = (userId: string, from: string, to: string) =>
   ['shopping-needs', userId, from, to] as const;

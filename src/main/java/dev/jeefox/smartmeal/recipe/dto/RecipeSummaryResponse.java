@@ -15,6 +15,7 @@ public record RecipeSummaryResponse(
         Integer preparationTimeMin,
 
         Integer servings,
-        List<MealType> mealTypes
+        List<MealType> mealTypes,
+        String coverImageUrl
 ) {
 }

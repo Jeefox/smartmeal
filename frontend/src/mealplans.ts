@@ -1,3 +1,4 @@
+import type { Participant, PersonPortion, PersonNutrition } from './household';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, request } from './api';
 import { useSession } from './session';
@@ -30,11 +31,12 @@ export type MealPlanEntry = {
   position: number;
   recipeSnapshot: RecipeSnapshot;
   nutrition: Nutrition;
+  personPortions?: PersonPortion[];
 };
 export type MealPlan = {
   id: string;
   planDate: string;
-  status: 'DRAFT' | 'CONFIRMED';
+  status: 'DRAFT' | 'CONFIRMED' | 'CANCELLED';
   dailyCalorieTargetSnapshot: number | null;
   dailyCalorieTarget: number | null;
   confirmedAt: string | null;
@@ -42,6 +44,8 @@ export type MealPlan = {
   updatedAt: string;
   entries: MealPlanEntry[];
   nutritionTotal: Nutrition;
+  participants?: Participant[];
+  people?: PersonNutrition[];
 };
 export const mealPlanKey = (userId: string, date: string) => ['meal-plan', userId, date] as const;
 export const mealPlanApi = {

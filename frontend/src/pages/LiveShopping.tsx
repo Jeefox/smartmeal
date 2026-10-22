@@ -3,14 +3,25 @@ import type { FormEvent } from 'react';
 import ShoppingEstimate from '../components/ShoppingEstimate';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Leaf, PackageOpen, RefreshCw, ShoppingBasket } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 import { useApp, useOnline } from '../state';
 import { useSession } from '../session';
+import { recentPeriod } from '../period-shopping';
 import { ApiError } from '../api';
 import { labelDate, number, weekDates } from '../domain';
 import { periodErrors, readShoppingNeeds, shoppingKey } from '../shopping';
 import { Empty, Loading, Notice, PageHeading } from '../components/ui';
 export default function LiveShopping() {
+  const session = useSession(),
+    [params] = useSearchParams();
+  const recent = session.profile?.userId ? recentPeriod(session.profile.userId) : null;
+  if (recent && !params.has('from') && !params.has('to') && params.get('view') !== 'calendar')
+    return (
+      <Navigate replace to={`/menu-generation?id=${encodeURIComponent(recent.id)}&tab=shopping`} />
+    );
+  return <ShoppingByPeriod />;
+}
+function ShoppingByPeriod() {
   const { selectedDate } = useApp();
   const session = useSession();
   const userId = session.profile!.userId;
@@ -203,7 +214,21 @@ export default function LiveShopping() {
                       <span className="needs-symbol" aria-hidden="true">
                         <Leaf size={17} />
                       </span>
-                      <span className="needs-name">{item.productName}</span>
+                      <span className="needs-name">
+                        {item.productName}
+                        <small className="muted">
+                          {' '}
+                          · нужно {number(item.requiredG ?? item.quantityG, 2)} г · дома{' '}
+                          {number(item.fromPantryG ?? 0, 2)} г
+                        </small>
+                        {item.quantityG > 0 && (
+                          <Link
+                            to={`/pantry?purchase=1&productId=${item.productId}&quantityG=${item.quantityG}`}
+                          >
+                            Купил — подтвердить массу
+                          </Link>
+                        )}
+                      </span>
                       <strong className="needs-quantity">
                         {number(item.quantityG, 2)} <small>г</small>
                       </strong>
@@ -240,7 +265,8 @@ export default function LiveShopping() {
               </p>
               <Notice>
                 Здесь указана покупная масса с учётом очистки. Выберите магазин выше для расчёта
-                целых упаковок и оценочной стоимости. Домашние запасы не вычитаются.
+                целых упаковок и оценочной стоимости. Доступные домашние запасы уже вычтены; резервы
+                других меню защищены.
               </Notice>
               <p className="caption">
                 Отметки «куплено» и замены появятся после подключения их сохранения. Сейчас список

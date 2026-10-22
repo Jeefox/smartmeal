@@ -53,7 +53,9 @@ export default function EstimateDetails({
                 <h3>{item.productName}</h3>
                 <span>Нужно {number(item.requiredWeightG, 2)} г</span>
               </div>
-              {item.purchaseCost == null ? (
+              {item.requiredWeightG === 0 && item.purchaseCost === 0 ? (
+                <Notice>Покупка не требуется: продукт покрыт домашними запасами.</Notice>
+              ) : item.purchaseCost == null ? (
                 <Notice tone="warning">
                   Нет предложения с известной ценой. Стоимость не определена.
                 </Notice>
@@ -111,7 +113,7 @@ export default function EstimateDetails({
       <p className="caption">
         Последняя неакционная цена без ограничения давности. Цены и наличие в магазине могут
         отличаться. Выбирается целое число одинаковых упаковок для каждого продукта; сочетания
-        разных упаковок не сравниваются. Домашние запасы не вычитаются.
+        разных упаковок не сравниваются. Доступные домашние запасы вычитаются до расчёта упаковок.
       </p>
       <p className="caption">
         {isFetching

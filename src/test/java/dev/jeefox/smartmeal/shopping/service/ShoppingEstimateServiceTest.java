@@ -1,5 +1,8 @@
 package dev.jeefox.smartmeal.shopping.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import dev.jeefox.smartmeal.exception.StoreInactiveException;
 import dev.jeefox.smartmeal.exception.StoreNotFoundException;
 import dev.jeefox.smartmeal.price.entity.PriceObservation;
@@ -12,6 +15,7 @@ import dev.jeefox.smartmeal.store.entity.Store;
 import dev.jeefox.smartmeal.store.entity.StoreProduct;
 import dev.jeefox.smartmeal.store.repository.StoreProductRepository;
 import dev.jeefox.smartmeal.store.repository.StoreRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +24,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class ShoppingEstimateServiceTest {
     private final String email = "estimate@example.invalid";
@@ -33,15 +34,34 @@ class ShoppingEstimateServiceTest {
     private ShoppingListService shopping;
     private PackageCostCalculator calculator;
     private ShoppingEstimateService service;
+    private final java.util.Map<Long, PriceObservation> batchPrices = new java.util.HashMap<>();
 
     @BeforeEach
     void setUp() {
+        batchPrices.clear();
         stores = mock(StoreRepository.class);
         packages = mock(StoreProductRepository.class);
         prices = mock(PriceObservationRepository.class);
+        when(prices.findLatestRegular(anyList()))
+                .thenAnswer(
+                        call ->
+                                ((List<Long>) call.getArgument(0))
+                                        .stream()
+                                                .map(batchPrices::get)
+                                                .filter(java.util.Objects::nonNull)
+                                                .toList());
         shopping = mock(ShoppingListService.class);
         calculator = spy(new PackageCostCalculator());
-        service = new ShoppingEstimateService(stores, packages, prices, shopping, calculator, mock(dev.jeefox.smartmeal.price.service.CataloguePriceReferenceService.class));
+        service =
+                new ShoppingEstimateService(
+                        stores,
+                        packages,
+                        prices,
+                        shopping,
+                        calculator,
+                        mock(
+                                dev.jeefox.smartmeal.price.service.CataloguePriceReferenceService
+                                        .class));
         Store store = mock(Store.class);
         when(store.isActive()).thenReturn(true);
         when(stores.findById(1L)).thenReturn(Optional.of(store));
@@ -50,13 +70,14 @@ class ShoppingEstimateServiceTest {
     @Test
     void preparedOffersAreReusedWithoutQueriesForEachMenu() {
         StoreProduct pack = pack(10L, 1L, 2000);
-        when(packages.findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L))).thenReturn(List.of(pack));
+        when(packages.findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L)))
+                .thenReturn(List.of(pack));
         price(10L, "40.00");
         var prepared = service.prepare(1L, List.of(1L));
         var list = new ShoppingListResponse(date, date, false, List.of(need(1L, "1500")));
         assertEquals(new BigDecimal("40.00"), prepared.apply(list).knownPurchaseCost());
         assertEquals(new BigDecimal("40.00"), prepared.apply(list).knownPurchaseCost());
-        verify(prices, times(1)).findFirstByStoreProduct_IdAndPromotionalFalseAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(10L);
+        verify(prices, times(1)).findLatestRegular(List.of(10L));
         verify(packages, times(1)).findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L));
     }
 
@@ -90,7 +111,9 @@ class ShoppingEstimateServiceTest {
         assertEquals(0, item.remainderG().signum());
         assertEquals(Instant.parse("2026-10-01T09:00:00Z"), item.priceObservedAt());
         assertEquals(PriceSource.MANUAL, item.priceSource());
-        verify(prices, never()).findFirstByStoreProduct_IdAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(anyLong());
+        verify(prices, never())
+                .findFirstByStoreProduct_IdAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(
+                        anyLong());
     }
 
     @Test
@@ -110,14 +133,17 @@ class ShoppingEstimateServiceTest {
         StoreProduct offer = pack(10L, 1L, 800);
         when(packages.findByStore_IdAndActiveTrueAndProduct_IdIn(1L, List.of(1L)))
                 .thenReturn(List.of(offer));
-        when(prices.findFirstByStoreProduct_IdAndPromotionalFalseAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(10L))
+        when(prices
+                        .findFirstByStoreProduct_IdAndPromotionalFalseAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(
+                                10L))
                 .thenReturn(Optional.empty());
         ShoppingEstimateResponse response = estimate();
         assertFalse(response.complete());
         assertEquals(new BigDecimal("0.00"), response.knownPurchaseCost());
         assertNull(response.items().getFirst().purchaseCost());
         assertNull(response.items().getFirst().storeProductId());
-        assertEquals(new BigDecimal("1000"), response.items().getFirst().requiredWeightG());
+        assertEquals(
+                0, new BigDecimal("1000").compareTo(response.items().getFirst().requiredWeightG()));
         verifyNoInteractions(calculator);
     }
 
@@ -169,7 +195,8 @@ class ShoppingEstimateServiceTest {
 
     @Test
     void suppliedShoppingListDoesNotTriggerAnotherCalculation() {
-        ShoppingListResponse supplied = new ShoppingListResponse(date, date.plusDays(1), true, List.of());
+        ShoppingListResponse supplied =
+                new ShoppingListResponse(date, date.plusDays(1), true, List.of());
         ShoppingEstimateResponse response = service.estimate(supplied, 1L);
         assertEquals(supplied.from(), response.from());
         assertEquals(supplied.to(), response.to());
@@ -207,7 +234,9 @@ class ShoppingEstimateServiceTest {
         when(observation.getPrice()).thenReturn(new BigDecimal(value));
         when(observation.getObservedAt()).thenReturn(Instant.parse("2026-10-01T09:00:00Z"));
         when(observation.getPriceSource()).thenReturn(PriceSource.MANUAL);
-        when(prices.findFirstByStoreProduct_IdAndPromotionalFalseAndInvalidatedAtIsNullOrderByObservedAtDescIdDesc(packageId))
-                .thenReturn(Optional.of(observation));
+        StoreProduct item = mock(StoreProduct.class);
+        when(item.getId()).thenReturn(packageId);
+        when(observation.getStoreProduct()).thenReturn(item);
+        batchPrices.put(packageId, observation);
     }
 }

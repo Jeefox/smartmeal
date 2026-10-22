@@ -13,6 +13,7 @@ import dev.jeefox.smartmeal.recipe.entity.Recipe;
 import dev.jeefox.smartmeal.recipe.entity.RecipeIngredient;
 import dev.jeefox.smartmeal.recipe.repository.RecipeIngredientRepository;
 import dev.jeefox.smartmeal.recipe.repository.RecipeRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +23,23 @@ import java.util.UUID;
 
 @Service
 public class MealPlanEntryService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private dev.jeefox.smartmeal.household.HouseholdSnapshots households;
+
     private final MealPlanRepository plans;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private dev.jeefox.smartmeal.user.repository.UserRepository users;
+
     private final MealPlanEntryRepository entries;
     private final RecipeRepository recipes;
     private final RecipeIngredientRepository ingredients;
 
-    public MealPlanEntryService(MealPlanRepository plans, MealPlanEntryRepository entries,
-                                RecipeRepository recipes, RecipeIngredientRepository ingredients) {
+    public MealPlanEntryService(
+            MealPlanRepository plans,
+            MealPlanEntryRepository entries,
+            RecipeRepository recipes,
+            RecipeIngredientRepository ingredients) {
         this.plans = plans;
         this.entries = entries;
         this.recipes = recipes;
@@ -38,32 +49,52 @@ public class MealPlanEntryService {
     @Transactional
     public MealPlanEntryResponse add(String email, UUID planId, AddMealPlanEntryRequest request) {
         MealPlan plan = requireEditablePlan(email, planId);
-        Recipe recipe = recipes.findById(request.recipeId())
-                .orElseThrow(() -> new RecipeNotFoundException(request.recipeId()));
-        List<RecipeIngredient> recipeIngredients = ingredients.findByRecipe_IdOrderByPositionAsc(recipe.getId());
+        if (households != null && !households.people(planId).isEmpty())
+            throw dev.jeefox.smartmeal.mealplan.generation.period.PlanningException.conflict(
+                    "Добавление нового блюда в семейное меню выполняется через общий подбор с"
+                        + " проверкой ограничений всех участников");
+        Recipe recipe =
+                recipes.findById(request.recipeId())
+                        .orElseThrow(() -> new RecipeNotFoundException(request.recipeId()));
+        List<RecipeIngredient> recipeIngredients =
+                ingredients.findByRecipe_IdOrderByPositionAsc(recipe.getId());
         RecipeSnapshot snapshot = RecipeSnapshotFactory.create(recipe, recipeIngredients);
-        int position = entries.findFirstByMealPlan_IdAndMealTypeOrderByPositionDesc(planId, request.mealType())
-                .map(entry -> Math.addExact(entry.getPosition(), 1)).orElse(1);
-        MealPlanEntry saved = entries.save(new MealPlanEntry(plan, recipe, request.mealType(),
-                request.portions(), position, snapshot));
+        int position =
+                entries.findFirstByMealPlan_IdAndMealTypeOrderByPositionDesc(
+                                planId, request.mealType())
+                        .map(entry -> Math.addExact(entry.getPosition(), 1))
+                        .orElse(1);
+        MealPlanEntry saved =
+                entries.save(
+                        new MealPlanEntry(
+                                plan,
+                                recipe,
+                                request.mealType(),
+                                request.portions(),
+                                position,
+                                snapshot));
         plan.markModified();
-        return MealPlanEntryResponse.from(saved);
+        return response(saved);
     }
 
     @Transactional(readOnly = true)
     public List<MealPlanEntryResponse> findAll(String email, UUID planId) {
         requireOwnedPlan(email, planId);
         return entries.findByMealPlan_IdOrderByMealTypeAscPositionAsc(planId).stream()
-                .sorted(Comparator.comparingInt((MealPlanEntry entry) -> entry.getMealType().ordinal())
-                        .thenComparingInt(MealPlanEntry::getPosition))
-                .map(MealPlanEntryResponse::from).toList();
+                .sorted(
+                        Comparator.comparingInt(
+                                        (MealPlanEntry entry) -> entry.getMealType().ordinal())
+                                .thenComparingInt(MealPlanEntry::getPosition))
+                .map(this::response)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public MealPlanEntryResponse findById(String email, UUID planId, UUID entryId) {
         requireOwnedPlan(email, planId);
-        return MealPlanEntryResponse.from(entries.findByIdAndMealPlan_Id(entryId, planId)
-                .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId)));
+        return response(
+                entries.findByIdAndMealPlan_Id(entryId, planId)
+                        .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId)));
     }
 
     private void requireOwnedPlan(String email, UUID planId) {
@@ -72,31 +103,42 @@ public class MealPlanEntryService {
     }
 
     @Transactional
-    public MealPlanEntryResponse updatePortions(String email, UUID planId, UUID entryId,
-                                                UpdateMealPlanEntryRequest request) {
+    public MealPlanEntryResponse updatePortions(
+            String email, UUID planId, UUID entryId, UpdateMealPlanEntryRequest request) {
         MealPlan plan = requireEditablePlan(email, planId);
-        MealPlanEntry entry = entries.findByIdAndMealPlan_Id(entryId, planId)
-                .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
+        MealPlanEntry entry =
+                entries.findByIdAndMealPlan_Id(entryId, planId)
+                        .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
         entry.updatePortions(request.portions());
         plan.markModified();
-        return MealPlanEntryResponse.from(entry);
+        return response(entry);
     }
 
     @Transactional
     public void delete(String email, UUID planId, UUID entryId) {
         MealPlan plan = requireEditablePlan(email, planId);
-        MealPlanEntry entry = entries.findByIdAndMealPlan_Id(entryId, planId)
-                .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
+        MealPlanEntry entry =
+                entries.findByIdAndMealPlan_Id(entryId, planId)
+                        .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
         entries.delete(entry);
         plan.markModified();
     }
 
     private MealPlan requireEditablePlan(String email, UUID planId) {
-        MealPlan plan = plans.findOwnedForUpdate(planId, email)
-                .orElseThrow(() -> new MealPlanNotFoundException(planId));
+        if (users != null)
+            users.findByEmailForUpdate(email)
+                    .orElseThrow(() -> new MealPlanNotFoundException(planId));
+        MealPlan plan =
+                plans.findOwnedForUpdate(planId, email)
+                        .orElseThrow(() -> new MealPlanNotFoundException(planId));
         if (plan.getStatus() != MealPlanStatus.DRAFT) {
             throw new MealPlanNotEditableException();
         }
         return plan;
+    }
+
+    private MealPlanEntryResponse response(MealPlanEntry entry) {
+        var result = MealPlanEntryResponse.from(entry);
+        return households == null ? result : households.decorate(result);
     }
 }

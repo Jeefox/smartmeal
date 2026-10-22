@@ -363,6 +363,11 @@ export function RecipeDetail() {
                 Сохранить
               </button>
             )}
+            {mode === 'api' && (
+              <Link className="button" to={`/recipes/${recipe.id}/planning`}>
+                Настройки подбора
+              </Link>
+            )}
             {mode === 'demo' && recipe.mine && (
               <Link className="button" to={`/recipes/${recipe.id}/edit`}>
                 Редактировать
@@ -555,6 +560,9 @@ export function Products() {
             <article className="panel" key={product.id}>
               <span className="eyebrow">ПРОДУКТ · {product.id}</span>
               <h3>{product.name}</h3>
+              {mode === 'api' && (
+                <Link to={`/products/${product.id}/planning`}>Проверка сведений об аллергенах</Link>
+              )}
               {mode === 'api' && (
                 <p className="caption">
                   Для покупок: {product.shoppingName ?? 'не указано'}

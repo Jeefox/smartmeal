@@ -19,6 +19,7 @@ public record RecipeResponse(
         NutritionValues nutritionPerServing,
         Instant createdAt,
         Instant updatedAt,
-        List<MealType> mealTypes
+        List<MealType> mealTypes,
+        String coverImageUrl
 ) {
 }

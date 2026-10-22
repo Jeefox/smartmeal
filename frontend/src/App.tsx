@@ -12,6 +12,7 @@ import {
   Settings2,
   ShoppingBasket,
   Store,
+  Users,
   WifiOff,
   X,
 } from 'lucide-react';
@@ -25,6 +26,11 @@ import { ProfilePage, StoresPage, AuthPage, Onboarding } from './pages/Settings'
 import { Empty, Loading } from './components/ui';
 import { RequireSession, useSession } from './session';
 import { Welcome } from './pages/Account';
+const PlanningPreferencesPage = lazy(() => import('./pages/PlanningPreferences'));
+const HouseholdPage = lazy(() => import('./pages/Household'));
+const PantryPage = lazy(() => import('./pages/Pantry'));
+const PeriodMenuPage = lazy(() => import('./pages/PeriodMenu'));
+const PlanningMetadataPage = lazy(() => import('./pages/PlanningMetadata'));
 const MenuPreviewPage = lazy(() => import('./pages/MenuPreview'));
 const Shopping = lazy(() => import('./pages/Shopping'));
 const mainNavigation = [
@@ -36,6 +42,8 @@ const mainNavigation = [
 const secondaryNavigation = [
   { to: '/stores', label: 'Магазины и бюджет', icon: Store },
   { to: '/products', label: 'Продукты', icon: Package },
+  { to: '/household', label: 'Семья и порции', icon: Users },
+  { to: '/pantry', label: 'Домашние запасы', icon: Package },
   { to: '/profile', label: 'Мой профиль', icon: CircleUserRound },
 ];
 export default function App() {
@@ -54,6 +62,7 @@ export default function App() {
       ?.label ||
     {
       '/menu-preview': 'Подбор меню',
+      '/menu-generation': 'Подбор на неделю',
       '/login': 'Вход',
       '/register': 'Регистрация',
       '/onboarding': 'Опрос',
@@ -227,6 +236,14 @@ export default function App() {
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage register />} />
             <Route element={<RequireSession />}>
+              <Route
+                path="/household"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <HouseholdPage />
+                  </Suspense>
+                }
+              />
               <Route path="/welcome" element={<Welcome />} />
               <Route path="/" element={<Planner />} />
               <Route path="/week" element={<Planner week />} />
@@ -238,11 +255,51 @@ export default function App() {
                   </Suspense>
                 }
               />
+              <Route
+                path="/planning-preferences"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <PlanningPreferencesPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/menu-generation"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <PeriodMenuPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/recipes/:id/planning"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <PlanningMetadataPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/products/:id/planning"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <PlanningMetadataPage product />
+                  </Suspense>
+                }
+              />
               <Route path="/recipes" element={<Catalog />} />
               <Route path="/recipes/new" element={<RecipeEditor />} />
               <Route path="/recipes/:id/edit" element={<RecipeEditor />} />
               <Route path="/recipes/:id" element={<RecipeDetail />} />
               <Route path="/products" element={<Products />} />
+              <Route
+                path="/pantry"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <PantryPage />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/shopping"
                 element={

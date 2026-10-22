@@ -11,6 +11,13 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.Optional;
 
 public interface PriceObservationRepository extends JpaRepository<PriceObservation, Long> {
+    @Query(value = """
+            select distinct on (store_product_id) * from price_observations
+            where store_product_id in (:ids) and not promotional and invalidated_at is null
+            order by store_product_id, observed_at desc, id desc
+            """, nativeQuery = true)
+    java.util.List<PriceObservation> findLatestRegular(java.util.List<Long> ids);
+
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<PriceObservation> findByIdAndStoreProduct_Id(Long id, Long storeProductId);

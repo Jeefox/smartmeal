@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router';
+import PlanInventory from '../components/PlanInventory';
 import { ApiError } from '../api';
 import { dateKey, labelDate, number, shiftDate, weekDates } from '../domain';
 import {
@@ -129,7 +130,8 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
         }))
       : [],
   });
-  const confirmed = plan?.status === 'CONFIRMED';
+  const confirmed = !!plan && plan.status !== 'DRAFT';
+  const family = (plan?.participants?.length || 0) > 1;
   const target = plan?.dailyCalorieTarget ?? null;
   const calories = plan?.nutritionTotal.calories;
   const progress = target && calories != null ? Math.min(100, (calories / target) * 100) : null;
@@ -184,6 +186,9 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
         }
         actions={
           <div className="preview-planner-actions">
+            <Link className="button secondary" to={`/menu-generation?from=${selectedDate}`}>
+              Подобрать неделю
+            </Link>
             <Link className="button primary" to={`/menu-preview?date=${selectedDate}`}>
               Подобрать меню
             </Link>
@@ -198,6 +203,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
           </div>
         }
       />
+      {plan && <PlanInventory key={plan.id} plan={plan} />}
       <div className="planner-toolbar">
         <div className="date-controls">
           <button
@@ -311,7 +317,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
               повторять сохранение автоматически не будем.
             </Notice>
           )}
-          {confirmed && (
+          {plan.status === 'CONFIRMED' && (
             <Notice tone="success">
               Меню подтверждено
               {plan.confirmedAt ? ` · ${new Date(plan.confirmedAt).toLocaleString('ru-RU')}` : ''}.
@@ -324,7 +330,13 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                 <span className="eyebrow">
                   {labelDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' })}
                 </span>
-                <span className="draft-badge">{confirmed ? 'Подтверждено' : 'Черновик'}</span>
+                <span className="draft-badge">
+                  {plan.status === 'CANCELLED'
+                    ? 'Отменено'
+                    : confirmed
+                      ? 'Подтверждено'
+                      : 'Черновик'}
+                </span>
               </div>
               <div className="energy-row">
                 <div>
@@ -332,7 +344,11 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                     {number(calories!)}
                     <span>{target ? ` / ${number(target)} ккал` : ' ккал · цель не задана'}</span>
                   </h2>
-                  <p>Запланировано, не фактически съедено · итоги сервера</p>
+                  <p>
+                    {family
+                      ? `На всех: ${plan.participants!.length} чел. · индивидуальные нормы ниже`
+                      : 'Запланировано, не фактически съедено · итоги сервера'}
+                  </p>
                 </div>
                 <div
                   className="energy-ring"
@@ -346,10 +362,22 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                 nutrition={plan.nutritionTotal}
                 label="КБЖУ меню дня · значения получены от сервера"
               />
+              {family && (
+                <div className="household-day" aria-label="Питание каждого">
+                  {plan.people?.map((p) => (
+                    <p key={p.participantId}>
+                      <strong>{p.name}</strong>: {number(p.nutrition.calories)} /{' '}
+                      {number(p.dailyCalorieTarget)} ккал
+                    </p>
+                  ))}
+                </div>
+              )}
               <p className="caption">
-                {confirmed
-                  ? 'Цель — снимок на момент подтверждения.'
-                  : 'Цель — текущая сохранённая калорийность профиля.'}
+                {family
+                  ? 'Нормы и состав семьи сохранены вместе с этим меню.'
+                  : confirmed
+                    ? 'Цель — снимок на момент подтверждения.'
+                    : 'Цель — текущая сохранённая калорийность профиля.'}
               </p>
               {!target && (
                 <Link className="text-link" to="/profile">
@@ -405,7 +433,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                     <span className="meal-symbol">{['☀', '◐', '☾', '✳'][index]}</span>
                     <h3>{mealLabels[type]}</h3>
                   </div>
-                  {!confirmed && (
+                  {!confirmed && !family && (
                     <button
                       className="icon-button"
                       disabled={busy || !online || query.isError}
@@ -436,8 +464,21 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                           {entry.recipeSnapshot.preparationTimeMin} мин ·{' '}
                           {number(entry.nutrition.calories)} ккал · {entry.portions} порц.
                         </p>
+                        {family && (
+                          <ul className="household-portions" aria-label="Порции по людям">
+                            {entry.personPortions?.map((p) => (
+                              <li key={p.participantId}>
+                                <strong>{p.name}</strong>: {number(p.portions, 2)} порц. ·{' '}
+                                {number(p.nutrition.calories)} ккал
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {confirmed ? (
-                          <span className="caption">Порции зафиксированы</span>
+                          <>
+                            <span className="caption">Порции зафиксированы</span>
+                            <PlanInventory plan={plan} entry={entry} />
+                          </>
                         ) : (
                           <PortionEditor
                             key={`${entry.id}-${entry.portions}`}
@@ -465,7 +506,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                     </article>
                   ))}
                 {!plan.entries.some((entry) => entry.mealType === type) &&
-                  (!confirmed ? (
+                  (!confirmed && !family ? (
                     <button
                       className="empty-meal"
                       disabled={busy || !online || query.isError}

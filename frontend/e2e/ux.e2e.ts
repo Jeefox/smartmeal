@@ -127,7 +127,8 @@ test('компактный каталог без неработающих фил
   const img = page.locator('.recipe-card img').first();
   await expect(img).toHaveAttribute('src', /omelette-960.webp/);
   await expect(img).toHaveAttribute('srcset', /480w/);
-  await expect(page.locator('.generated-cover-label').first()).toContainText('AI');
+  await expect(page.locator('.generated-cover-label').first()).toContainText('Фото подачи');
+  await expect(page.locator('.generated-cover-label').first()).toHaveAttribute('title', /CC0/);
   await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Следующая страница', exact: true }).click();
   await expect(page).toHaveURL(/page=1/);

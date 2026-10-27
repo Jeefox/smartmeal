@@ -31,6 +31,7 @@ export function Dialog({
   closeRef.current = onClose;
   useEffect(() => {
     const dialog = ref.current!;
+    const previous = document.activeElement;
     dialog.showModal();
     const handler = (event: Event) => {
       event.preventDefault();
@@ -40,6 +41,10 @@ export function Dialog({
     return () => {
       dialog.removeEventListener('cancel', handler);
       dialog.close();
+      queueMicrotask(() => {
+        if (previous instanceof HTMLElement && previous.isConnected)
+          previous.focus({ preventScroll: true });
+      });
     };
   }, []);
   return (

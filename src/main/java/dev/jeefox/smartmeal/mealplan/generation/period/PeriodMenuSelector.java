@@ -182,6 +182,7 @@ public class PeriodMenuSelector {
                             Basket cost =
                                     baskets.calculate(
                                             selected, context.offers(), options, context.pantry());
+                            if (!GroceryPolicy.fits(options, cost)) continue;
                             double score = score(selected, context, date, currentMeal, byId);
                             String key =
                                     state.key()
@@ -289,6 +290,7 @@ public class PeriodMenuSelector {
                     Basket cost =
                             baskets.calculate(
                                     selected, context.offers(), options, context.pantry());
+                    if (!GroceryPolicy.fits(options, cost)) continue;
                     State attempt =
                             new State(
                                     List.copyOf(selected),
@@ -361,7 +363,12 @@ public class PeriodMenuSelector {
                 Selection choice =
                         evaluator.selection(candidate, date, meal, portion, locked != null);
                 selected.add(choice);
-                double value = score(selected, context, date, slot % 3, byId);
+                double value =
+                        GroceryPolicy.fits(context, options, selected)
+                                ? score(selected, context, date, slot % 3, byId)
+                                : Double.POSITIVE_INFINITY;
+                if (options.maxShoppingProducts() != null && Double.isFinite(value))
+                    value += GroceryPolicy.count(context, options, selected) * .12;
                 selected.removeLast();
                 if (value < bestScore) {
                     best = choice;

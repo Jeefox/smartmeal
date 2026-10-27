@@ -15,7 +15,37 @@ import {
 import { number, labelDate } from '../domain';
 import { Dialog, Notice } from './ui';
 const money = (value: number) => `${number(value, 2)} ₽`;
-export default function PeriodShoppingList({
+export default function PeriodShoppingList(props: {
+  view: PeriodView;
+  userId: string;
+  savePanel?: ReactNode;
+  onMissing?: () => void;
+}) {
+  if (props.view.savedPlanIds.length)
+    return (
+      <>
+        <h1>Что купить</h1>
+        <p>Меню сохранено. Откройте список с отметками и пополнением запасов.</p>
+        <Link
+          className="button primary"
+          to={`/shopping-lists?source=${encodeURIComponent(props.view.id)}`}
+        >
+          Открыть покупки по меню
+        </Link>
+        <p>
+          <Link className="text-link" to="/shopping-lists">
+            Все списки покупок
+          </Link>
+        </p>
+        <details className="panel">
+          <summary>Исходный расчёт покупок</summary>
+          <PreviewShoppingList {...props} />
+        </details>
+      </>
+    );
+  return <PreviewShoppingList {...props} />;
+}
+function PreviewShoppingList({
   view,
   userId,
   savePanel,
@@ -60,7 +90,7 @@ export default function PeriodShoppingList({
       <div className="purchase-heading">
         <div>
           <span className="eyebrow">
-            {partial ? 'ПРЕДВАРИТЕЛЬНЫЙ СПИСОК' : 'МОЖНО БРАТЬ В МАГАЗИН'}
+            {!view.savedPlanIds.length ? 'ПРЕДВАРИТЕЛЬНЫЙ СПИСОК' : 'К СОХРАНЁННОМУ МЕНЮ'}
           </span>
           <h1>Что купить</h1>
           <p>
@@ -173,7 +203,7 @@ export default function PeriodShoppingList({
                         type="checkbox"
                         aria-label={`Взял: ${item.productName}`}
                         checked={picked}
-                        disabled={loaded !== storageKey}
+                        disabled={view.savedPlanIds.length > 0 || loaded !== storageKey}
                         onChange={() => toggle(key)}
                       />
                       <span className="purchase-tick" aria-hidden="true">

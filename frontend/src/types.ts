@@ -1,4 +1,11 @@
-export type Nutrition = { calories: number; protein: number; fat: number; carbs: number };
+export type Nutrition = {
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  knownFiber?: number;
+  fiberComplete?: boolean;
+};
 export type Ingredient = {
   id?: string;
   productId: number;
@@ -125,6 +132,8 @@ export type ShoppingList = {
 export type Sex = 'MALE' | 'FEMALE';
 export type Goal = 'LOSE_WEIGHT' | 'MAINTAIN_WEIGHT' | 'GAIN_WEIGHT';
 export type UserProfile = {
+  canEditCatalogue?: boolean;
+  equipmentConfigured?: boolean;
   userId: string;
   dailyCalorieTarget: number | null;
   age: number | null;

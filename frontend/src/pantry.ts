@@ -94,6 +94,11 @@ export function usePantryCommand() {
       previous.current = null;
       await Promise.all([
         client.invalidateQueries({ queryKey: ['pantry', profile?.userId] }),
+        client.invalidateQueries({ queryKey: ['cooking', profile?.userId] }),
+        client.invalidateQueries({ queryKey: ['cooking-corrections', profile?.userId] }),
+        client.invalidateQueries({ queryKey: ['saved-replacements', profile?.userId] }),
+        client.invalidateQueries({ queryKey: ['shopping-session', profile?.userId] }),
+        client.invalidateQueries({ queryKey: ['shopping-sessions', profile?.userId] }),
         client.invalidateQueries({ queryKey: ['pantry-history', profile?.userId] }),
         client.invalidateQueries({ queryKey: ['plan-inventory', profile?.userId] }),
         client.invalidateQueries({ queryKey: ['meal-plan', profile?.userId] }),
@@ -111,8 +116,14 @@ export function usePantryCommand() {
             : 'Не удалось сохранить',
       );
       // Read fresh revision after a conflict, without automatically repeating a mutation.
+      await client.invalidateQueries({ queryKey: ['cooking', profile?.userId] });
+      await client.invalidateQueries({ queryKey: ['cooking-corrections', profile?.userId] });
+      await client.invalidateQueries({ queryKey: ['saved-replacements', profile?.userId] });
+      await client.invalidateQueries({ queryKey: ['shopping-session', profile?.userId] });
+      await client.invalidateQueries({ queryKey: ['shopping-sessions', profile?.userId] });
       await client.invalidateQueries({ queryKey: ['pantry', profile?.userId] });
       await client.invalidateQueries({ queryKey: ['plan-inventory', profile?.userId] });
+      await client.invalidateQueries({ queryKey: ['meal-plan', profile?.userId] });
       return saved;
     } finally {
       pending.current = false;

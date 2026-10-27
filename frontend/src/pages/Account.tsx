@@ -1,15 +1,8 @@
+import { NutrientTargetsForm } from './NutritionTargets';
+import { KitchenSummary } from '../components/KitchenSummary';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import {
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  Leaf,
-  LogOut,
-  RefreshCw,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Check, ChevronLeft, Leaf, LogOut, RefreshCw, Sparkles } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api, ApiError } from '../api';
 import { activityOptions } from '../activity';
@@ -66,6 +59,10 @@ export function ServerAuth({ register = false }: { register?: boolean }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (pending.current || !online) return;
+    if (register && new TextEncoder().encode(password).length > 72) {
+      setErrors({ password: 'Пароль должен занимать не более 72 байт UTF-8.' });
+      return;
+    }
     pending.current = true;
     setBusy(true);
     setError('');
@@ -75,15 +72,21 @@ export function ServerAuth({ register = false }: { register?: boolean }) {
         await api.register(email, password);
         setPassword('');
         setRegistered(true);
-        notify('Аккаунт создан. Теперь войдите.');
+        notify('Запрос обработан. Перейдите ко входу.');
       } else {
         await api.login(email, password);
         setPassword('');
         const profile = await session.refresh();
         notify('Вход выполнен');
-        navigate(profile.dailyCalorieTarget == null ? '/welcome' : safeNext(params.get('next')), {
-          replace: true,
-        });
+        const next = profile.dailyCalorieTarget == null ? '/welcome' : safeNext(params.get('next'));
+        navigate(
+          profile.equipmentConfigured === false
+            ? `/setup/kitchen?next=${encodeURIComponent(next)}`
+            : next,
+          {
+            replace: true,
+          },
+        );
       }
     } catch (err) {
       setError(errorMessage(err));
@@ -109,11 +112,14 @@ export function ServerAuth({ register = false }: { register?: boolean }) {
       </div>
       <section className="panel auth-form">
         <span className="eyebrow">SMARTMEAL · ЛИЧНЫЙ АККАУНТ</span>
-        <h2>{registered ? 'Аккаунт создан' : register ? 'Создать аккаунт' : 'С возвращением'}</h2>
+        <h2>
+          {registered ? 'Перейдите ко входу' : register ? 'Создать аккаунт' : 'С возвращением'}
+        </h2>
         {registered ? (
           <>
             <Notice tone="success">
-              Регистрация завершена. Автоматического входа нет — войдите с вашим email и паролем.
+              Если адрес свободен, аккаунт создан. Войдите с вашим email и паролем. Для
+              существующего аккаунта используйте прежний пароль.
             </Notice>
             <Link className="button primary full" to="/login">
               Перейти ко входу
@@ -156,7 +162,7 @@ export function ServerAuth({ register = false }: { register?: boolean }) {
                 type="password"
                 name="password"
                 minLength={register ? 8 : undefined}
-                maxLength={128}
+                maxLength={72}
                 autoComplete={register ? 'new-password' : 'current-password'}
                 required
                 value={password}
@@ -180,10 +186,7 @@ export function ServerAuth({ register = false }: { register?: boolean }) {
             </Link>
           </form>
         )}
-        <p className="caption">
-          <ShieldCheck size={15} />
-          Серверная сессия через cookie. Пароль не сохраняется в браузерном хранилище.
-        </p>
+
         {session.error && (
           <p className="caption">
             Не удалось проверить сессию.{' '}
@@ -322,7 +325,7 @@ export function TargetForm({ suggestion }: { suggestion?: number }) {
           {error}
         </p>
       )}
-      <p className="caption">Цель изменится только после нажатия кнопки подтверждения.</p>
+      <p className="caption"></p>
     </div>
   );
 }
@@ -345,7 +348,7 @@ export function AccountProfile() {
       <PageHeading
         eyebrow="ЛИЧНЫЙ АККАУНТ"
         title="Мой профиль"
-        description="Ваши параметры и цель сохраняются на сервере."
+        description="Ваши параметры, питание и техника."
         actions={
           <button className="button" disabled={!online || session.ending} onClick={logout}>
             <LogOut size={16} />
@@ -359,7 +362,7 @@ export function AccountProfile() {
             <Leaf size={32} />
           </div>
           <h2>Личный профиль</h2>
-          <p className="caption">Сессия подтверждена сервером</p>
+
           <Link className="button full" to="/onboarding">
             {hasQuestionnaire(p) ? 'Изменить анкету' : 'Заполнить анкету'}
           </Link>
@@ -398,13 +401,14 @@ export function AccountProfile() {
                 ? 'Повторить расчёт и изменить анкету'
                 : 'Пройти опрос для расчёта'}
             </Link>
-            <Notice>
-              Изменение анкеты не заменяет подтверждённую цель. Ограничения, оборудование и БЖУ пока
-              не входят в доступный контракт профиля.
-            </Notice>
+            <Link className="text-link" to="/planning-preferences">
+              Аллергии и исключения
+            </Link>
           </div>
         </section>
       </div>
+      <NutrientTargetsForm embedded />
+      <KitchenSummary />
     </>
   );
 }

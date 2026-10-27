@@ -1,3 +1,4 @@
+import { useSession } from '../session';
 import { useState } from 'react';
 import { useDebounce } from '../hooks';
 import { useQuery } from '@tanstack/react-query';
@@ -72,7 +73,12 @@ export function Catalog() {
   const time = params.get('maxTime') || '';
   const sort = params.get('sort') || 'createdAt,desc';
   const favoriteOnly = params.get('favorites') === 'true';
-  const query = new URLSearchParams({ q: debounced, page: String(page), size: '12', sort });
+  const query = new URLSearchParams({
+    q: debounced,
+    page: String(page),
+    size: '12',
+    sort,
+  });
   query.append('sort', 'id,asc');
 
   const response = useQuery({
@@ -114,10 +120,12 @@ export function Catalog() {
         title="Что приготовим?"
         description="Знакомые продукты. Новые любимые блюда."
         actions={
-          <Link className="button primary" to="/recipes/new">
-            <Plus size={18} />
-            Добавить рецепт
-          </Link>
+          <CatalogueEditing>
+            <Link className="button primary" to="/recipes/new">
+              <Plus size={18} />
+              Добавить рецепт
+            </Link>
+          </CatalogueEditing>
         }
       />
       <div className="section-title">
@@ -339,13 +347,19 @@ export function RecipeDetail() {
   const valid = Number.isFinite(selected) && selected > 0 && selected <= 100;
   const scaled =
     recipe.nutritionTotal && valid
-      ? (Object.fromEntries(
-          Object.entries(recipe.nutritionTotal).map(([key, value]) => [
-            key,
-            (value * selected) / recipe.servings,
-          ]),
-        ) as typeof recipe.nutritionTotal)
+      ? {
+          ...recipe.nutritionTotal,
+          calories: (recipe.nutritionTotal.calories * selected) / recipe.servings,
+          protein: (recipe.nutritionTotal.protein * selected) / recipe.servings,
+          fat: (recipe.nutritionTotal.fat * selected) / recipe.servings,
+          carbs: (recipe.nutritionTotal.carbs * selected) / recipe.servings,
+          knownFiber:
+            recipe.nutritionTotal.knownFiber == null
+              ? undefined
+              : (recipe.nutritionTotal.knownFiber * selected) / recipe.servings,
+        }
       : null;
+
   return (
     <>
       <Link className="back-link" to="/recipes">
@@ -364,9 +378,11 @@ export function RecipeDetail() {
               </button>
             )}
             {mode === 'api' && (
-              <Link className="button" to={`/recipes/${recipe.id}/planning`}>
-                Настройки подбора
-              </Link>
+              <CatalogueEditing>
+                <Link className="button" to={`/recipes/${recipe.id}/planning`}>
+                  Настройки подбора
+                </Link>
+              </CatalogueEditing>
             )}
             {mode === 'demo' && recipe.mine && (
               <Link className="button" to={`/recipes/${recipe.id}/edit`}>
@@ -494,7 +510,11 @@ export function Products() {
   const debounced = useDebounce(q);
   const page = Math.max(0, Number(params.get('page')) || 0);
   const category = params.get('categoryId') || '';
-  const query = new URLSearchParams({ q: debounced, page: String(page), size: '12' });
+  const query = new URLSearchParams({
+    q: debounced,
+    page: String(page),
+    size: '12',
+  });
   if (category) query.set('categoryId', category);
   const response = useQuery({
     queryKey: ['products', mode, query.toString()],
@@ -597,4 +617,10 @@ export function Products() {
       <p className="caption">Всего продуктов: {total}</p>
     </>
   );
+}
+
+function CatalogueEditing({ children }: { children: import('react').ReactNode }) {
+  const { mode } = useApp();
+  const { profile } = useSession();
+  return mode === 'demo' || profile?.canEditCatalogue ? children : null;
 }

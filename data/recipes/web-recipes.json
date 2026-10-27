@@ -6,22 +6,42 @@
     "description": "Молочная пшённая каша с мягкой тыквой для завтрака.",
     "preparationTimeMin": 35,
     "servings": 2,
-    "mealTypes": ["BREAKFAST"],
+    "mealTypes": [
+      "BREAKFAST"
+    ],
     "sourceTitle": "Пшенная каша с тыквой — Простоквашино",
     "sourceUrl": "https://prostokvashino.ru/recipes/pshennaia-kasha-s-tykvoi/",
     "adaptation": "Количество ингредиентов приведено к двум порциям и продуктам SmartMeal; вода и необязательные специи исключены из расчёта.",
     "ingredients": [
-      {"productName": "Пшено сухое", "quantityG": 100},
-      {"productName": "Тыква очищенная", "quantityG": 250},
-      {"productName": "Молоко 2,5%", "quantityG": 300},
-      {"productName": "Масло сливочное 82,5%", "quantityG": 10},
-      {"productName": "Сахар", "quantityG": 10}
+      {
+        "productName": "Пшено сухое",
+        "quantityG": 100
+      },
+      {
+        "productName": "Тыква очищенная",
+        "quantityG": 250
+      },
+      {
+        "productName": "Молоко 2,5%",
+        "quantityG": 300
+      },
+      {
+        "productName": "Масло сливочное 82,5%",
+        "quantityG": 10
+      },
+      {
+        "productName": "Сахар",
+        "quantityG": 10
+      }
     ],
     "steps": [
       "Пшено несколько раз промойте горячей водой. Тыкву нарежьте небольшими кубиками.",
       "Положите тыкву в кастрюлю, добавьте немного воды и готовьте под крышкой около 10 минут до начала размягчения.",
       "Добавьте пшено и молоко. После закипания варите на слабом огне 15–20 минут, периодически помешивая.",
       "Вмешайте сахар и масло, снимите с огня и оставьте под крышкой на 5 минут."
+    ],
+    "equipmentCodes": [
+      "POT"
     ]
   },
   {
@@ -31,23 +51,47 @@
     "description": "Творожные сырники с манкой и тонкой мучной панировкой.",
     "preparationTimeMin": 35,
     "servings": 3,
-    "mealTypes": ["BREAKFAST", "SNACK"],
+    "mealTypes": [
+      "BREAKFAST",
+      "SNACK"
+    ],
     "sourceTitle": "Сырники с манкой — Gastronom.ru",
     "sourceUrl": "https://www.gastronom.ru/recipe/37728/syrniki-s-mankoj",
     "adaptation": "Пропорции округлены для справочника SmartMeal, а этапы приготовления изложены заново.",
     "ingredients": [
-      {"productName": "Творог 5%", "quantityG": 500},
-      {"productName": "Крупа манная сухая", "quantityG": 50},
-      {"productName": "Яйцо куриное без скорлупы", "quantityG": 55},
-      {"productName": "Сахар", "quantityG": 30},
-      {"productName": "Мука пшеничная", "quantityG": 30},
-      {"productName": "Масло подсолнечное", "quantityG": 15}
+      {
+        "productName": "Творог 5%",
+        "quantityG": 500
+      },
+      {
+        "productName": "Крупа манная сухая",
+        "quantityG": 50
+      },
+      {
+        "productName": "Яйцо куриное без скорлупы",
+        "quantityG": 55
+      },
+      {
+        "productName": "Сахар",
+        "quantityG": 30
+      },
+      {
+        "productName": "Мука пшеничная",
+        "quantityG": 30
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 15
+      }
     ],
     "steps": [
       "Разомните творог, смешайте его с яйцом, сахаром и манной крупой до однородности.",
       "Оставьте массу на 15 минут, чтобы манка впитала влагу.",
       "Сформируйте сырники влажными руками и слегка обваляйте их в муке.",
       "Обжаривайте на умеренном огне по 2–3 минуты с каждой стороны до румяной корочки и готовой середины."
+    ],
+    "equipmentCodes": [
+      "PAN"
     ]
   },
   {
@@ -57,22 +101,44 @@
     "description": "Рассыпчатая перловая крупа с грибами, луком и соевым соусом.",
     "preparationTimeMin": 65,
     "servings": 3,
-    "mealTypes": ["LUNCH", "DINNER"],
+    "mealTypes": [
+      "LUNCH",
+      "DINNER"
+    ],
     "sourceTitle": "Перловка с грибами — Т—Ж",
     "sourceUrl": "https://t-j.ru/mushroom-perlovka/",
     "adaptation": "Использованы шампиньоны из каталога SmartMeal; количество масла и соуса зафиксировано для расчёта пищевой ценности.",
     "ingredients": [
-      {"productName": "Крупа перловая сухая", "quantityG": 180},
-      {"productName": "Шампиньоны свежие", "quantityG": 300},
-      {"productName": "Лук репчатый", "quantityG": 120},
-      {"productName": "Масло подсолнечное", "quantityG": 15},
-      {"productName": "Соевый соус", "quantityG": 20}
+      {
+        "productName": "Крупа перловая сухая",
+        "quantityG": 180
+      },
+      {
+        "productName": "Шампиньоны свежие",
+        "quantityG": 300
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 120
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 15
+      },
+      {
+        "productName": "Соевый соус",
+        "quantityG": 20
+      }
     ],
     "steps": [
       "Перловку промойте и заранее замочите, если это рекомендует производитель крупы.",
       "Залейте крупу свежей водой и варите до мягкости согласно времени на упаковке, затем слейте лишнюю воду.",
       "Лук нарежьте мелко, шампиньоны — пластинами. Обжарьте лук на масле, добавьте грибы и готовьте до испарения жидкости.",
       "Соедините грибы с перловкой, добавьте соевый соус и прогрейте всё вместе 3–5 минут."
+    ],
+    "equipmentCodes": [
+      "PAN",
+      "POT"
     ]
   },
   {
@@ -82,23 +148,47 @@
     "description": "Густой овощной суп-пюре с кусочками филе индейки.",
     "preparationTimeMin": 50,
     "servings": 4,
-    "mealTypes": ["LUNCH"],
+    "mealTypes": [
+      "LUNCH"
+    ],
     "sourceTitle": "Тыквенный суп-пюре с индейкой — Аймкук",
     "sourceUrl": "https://www.iamcook.ru/showrecipe/33822",
     "adaptation": "Овощи и их веса приведены к справочнику SmartMeal; количество воды выбирается по желаемой густоте.",
     "ingredients": [
-      {"productName": "Филе индейки сырое", "quantityG": 300},
-      {"productName": "Тыква очищенная", "quantityG": 300},
-      {"productName": "Картофель очищенный", "quantityG": 250},
-      {"productName": "Морковь", "quantityG": 100},
-      {"productName": "Лук репчатый", "quantityG": 100},
-      {"productName": "Масло подсолнечное", "quantityG": 10}
+      {
+        "productName": "Филе индейки сырое",
+        "quantityG": 300
+      },
+      {
+        "productName": "Тыква очищенная",
+        "quantityG": 300
+      },
+      {
+        "productName": "Картофель очищенный",
+        "quantityG": 250
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 100
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 100
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 10
+      }
     ],
     "steps": [
       "Индейку нарежьте небольшими кусочками, залейте водой и варите после закипания около 20 минут, снимая пену.",
       "Нарежьте тыкву, картофель, морковь и лук. Слегка припустите лук и морковь на масле.",
       "Выньте готовую индейку. Положите в бульон все овощи и варите до мягкости картофеля и тыквы.",
       "Измельчите овощи с частью бульона погружным блендером, верните индейку и прогрейте суп до закипания."
+    ],
+    "equipmentCodes": [
+      "BLENDER",
+      "POT"
     ]
   },
   {
@@ -108,24 +198,52 @@
     "description": "Запечённое филе трески с брокколи, морковью и сметанно-яичной заливкой.",
     "preparationTimeMin": 50,
     "servings": 4,
-    "mealTypes": ["LUNCH", "DINNER"],
+    "mealTypes": [
+      "LUNCH",
+      "DINNER"
+    ],
     "sourceTitle": "Филе трески с овощами под сметанной заливкой — Food.ru",
     "sourceUrl": "https://food.ru/recipes/272423-file-treski-s-ovoshchami-pod-smetannoi-zalivkoi-1776417378",
     "adaptation": "Масса продуктов округлена, а необязательные соль и специи не включены в расчёт SmartMeal.",
     "ingredients": [
-      {"productName": "Треска филе сырое", "quantityG": 400},
-      {"productName": "Брокколи", "quantityG": 150},
-      {"productName": "Морковь", "quantityG": 200},
-      {"productName": "Лук репчатый", "quantityG": 160},
-      {"productName": "Сметана 15%", "quantityG": 65},
-      {"productName": "Яйцо куриное без скорлупы", "quantityG": 60},
-      {"productName": "Масло подсолнечное", "quantityG": 10}
+      {
+        "productName": "Треска филе сырое",
+        "quantityG": 400
+      },
+      {
+        "productName": "Брокколи",
+        "quantityG": 150
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 200
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 160
+      },
+      {
+        "productName": "Сметана 15%",
+        "quantityG": 65
+      },
+      {
+        "productName": "Яйцо куриное без скорлупы",
+        "quantityG": 60
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 10
+      }
     ],
     "steps": [
       "Размороженную треску обсушите и нарежьте порционными кусками. Лук нарежьте, морковь натрите.",
       "На масле готовьте лук и морковь 7–10 минут, чтобы они стали мягче. Брокколи разделите на небольшие соцветия.",
       "Смешайте яйцо со сметаной. В форму выложите рыбу, овощи и залейте сметанной смесью.",
       "Запекайте при 180 °C примерно 30–40 минут, пока рыба полностью не приготовится."
+    ],
+    "equipmentCodes": [
+      "OVEN",
+      "PAN"
     ]
   },
   {
@@ -135,23 +253,48 @@
     "description": "Быстрое основное блюдо из киноа, индейки и сладкого перца.",
     "preparationTimeMin": 40,
     "servings": 3,
-    "mealTypes": ["LUNCH", "DINNER"],
+    "mealTypes": [
+      "LUNCH",
+      "DINNER"
+    ],
     "sourceTitle": "Киноа с индейкой и овощами — Аймкук",
     "sourceUrl": "https://www.iamcook.ru/showrecipe/24819",
     "adaptation": "Набор овощей упрощён до базового каталога SmartMeal, пропорции рассчитаны на три порции.",
     "ingredients": [
-      {"productName": "Киноа сухая", "quantityG": 150},
-      {"productName": "Филе индейки сырое", "quantityG": 350},
-      {"productName": "Перец сладкий", "quantityG": 180},
-      {"productName": "Морковь", "quantityG": 100},
-      {"productName": "Лук репчатый", "quantityG": 100},
-      {"productName": "Масло подсолнечное", "quantityG": 15}
+      {
+        "productName": "Киноа сухая",
+        "quantityG": 150
+      },
+      {
+        "productName": "Филе индейки сырое",
+        "quantityG": 350
+      },
+      {
+        "productName": "Перец сладкий",
+        "quantityG": 180
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 100
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 100
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 15
+      }
     ],
     "steps": [
       "Киноа тщательно промойте и сварите в воде по инструкции на упаковке.",
       "Индейку нарежьте небольшими кусочками и обжарьте на половине масла до изменения цвета.",
       "Добавьте нарезанные лук, морковь и перец, оставшееся масло и готовьте до мягкости овощей и полной готовности мяса.",
       "Соедините содержимое сковороды с киноа и прогрейте 2–3 минуты."
+    ],
+    "equipmentCodes": [
+      "PAN",
+      "POT"
     ]
   },
   {
@@ -161,20 +304,37 @@
     "description": "Запечённое филе лосося с брокколи и лимоном.",
     "preparationTimeMin": 25,
     "servings": 2,
-    "mealTypes": ["DINNER"],
+    "mealTypes": [
+      "DINNER"
+    ],
     "sourceTitle": "Запечённый лосось с брокколи — Food.ru",
     "sourceUrl": "https://food.ru/recipes/163908-zapechennyi-losos-s-brokkoli-v-dukhovke-1681292830",
     "adaptation": "Использован сырой вес рыбы и брокколи; количество масла и лимона зафиксировано для расчёта.",
     "ingredients": [
-      {"productName": "Лосось филе сырое", "quantityG": 400},
-      {"productName": "Брокколи", "quantityG": 300},
-      {"productName": "Лимон без кожуры", "quantityG": 50},
-      {"productName": "Масло оливковое", "quantityG": 10}
+      {
+        "productName": "Лосось филе сырое",
+        "quantityG": 400
+      },
+      {
+        "productName": "Брокколи",
+        "quantityG": 300
+      },
+      {
+        "productName": "Лимон без кожуры",
+        "quantityG": 50
+      },
+      {
+        "productName": "Масло оливковое",
+        "quantityG": 10
+      }
     ],
     "steps": [
       "Разогрейте духовку до 180 °C. Рыбу обсушите, брокколи разберите на небольшие соцветия.",
       "Выложите рыбу и брокколи в форму, сбрызните маслом и лимонным соком.",
       "Запекайте около 15 минут. Перед подачей убедитесь, что рыба полностью приготовилась и легко разделяется вилкой."
+    ],
+    "equipmentCodes": [
+      "OVEN"
     ]
   },
   {
@@ -184,25 +344,54 @@
     "description": "Сытный постный суп из бобовых, тыквы и томатной пасты.",
     "preparationTimeMin": 80,
     "servings": 6,
-    "mealTypes": ["LUNCH"],
+    "mealTypes": [
+      "LUNCH"
+    ],
     "sourceTitle": "Суп из чечевицы с нутом и тыквой — Gastronom.ru",
     "sourceUrl": "https://www.gastronom.ru/recipe/22289/sup-iz-chechevicy-s-nutom-i-tykvoj",
     "adaptation": "Нут указан сухим весом до замачивания; бульон заменён водой и не участвует в пищевом расчёте.",
     "ingredients": [
-      {"productName": "Нут сухой", "quantityG": 120},
-      {"productName": "Чечевица сухая", "quantityG": 120},
-      {"productName": "Тыква очищенная", "quantityG": 300},
-      {"productName": "Лук репчатый", "quantityG": 120},
-      {"productName": "Морковь", "quantityG": 120},
-      {"productName": "Томатная паста", "quantityG": 40},
-      {"productName": "Чеснок", "quantityG": 10},
-      {"productName": "Масло оливковое", "quantityG": 20}
+      {
+        "productName": "Нут сухой",
+        "quantityG": 120
+      },
+      {
+        "productName": "Чечевица сухая",
+        "quantityG": 120
+      },
+      {
+        "productName": "Тыква очищенная",
+        "quantityG": 300
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 120
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 120
+      },
+      {
+        "productName": "Томатная паста",
+        "quantityG": 40
+      },
+      {
+        "productName": "Чеснок",
+        "quantityG": 10
+      },
+      {
+        "productName": "Масло оливковое",
+        "quantityG": 20
+      }
     ],
     "steps": [
       "Нут заранее замочите на 8–12 часов, промойте, залейте свежей водой и варите почти до мягкости.",
       "Лук и морковь нарежьте и готовьте на масле до мягкости. Добавьте чеснок и томатную пасту, прогрейте ещё минуту.",
       "Переложите заправку к нуту, добавьте промытую чечевицу и нарезанную тыкву.",
       "Варите при слабом кипении до мягкости бобовых и тыквы, при необходимости доливая горячую воду."
+    ],
+    "equipmentCodes": [
+      "POT"
     ]
   },
   {
@@ -212,20 +401,38 @@
     "description": "Овощной салат с отварным нутом и оливковым маслом.",
     "preparationTimeMin": 70,
     "servings": 2,
-    "mealTypes": ["LUNCH", "SNACK"],
+    "mealTypes": [
+      "LUNCH",
+      "SNACK"
+    ],
     "sourceTitle": "Салат с нутом, помидорами и мятой — Еда (Рамблер)",
     "sourceUrl": "https://eda.rambler.ru/recepty/salaty/salat-s-nutom-pomidorami-mjatoj-24892",
     "adaptation": "Готовый нут пересчитан в сухой вес до замачивания; мята исключена, добавлен доступный в справочнике огурец.",
     "ingredients": [
-      {"productName": "Нут сухой", "quantityG": 80},
-      {"productName": "Помидор", "quantityG": 200},
-      {"productName": "Огурец", "quantityG": 150},
-      {"productName": "Масло оливковое", "quantityG": 20}
+      {
+        "productName": "Нут сухой",
+        "quantityG": 80
+      },
+      {
+        "productName": "Помидор",
+        "quantityG": 200
+      },
+      {
+        "productName": "Огурец",
+        "quantityG": 150
+      },
+      {
+        "productName": "Масло оливковое",
+        "quantityG": 20
+      }
     ],
     "steps": [
       "Нут замочите на ночь, промойте и сварите в свежей воде до мягкости. Полностью остудите.",
       "Помидоры и огурцы нарежьте небольшими кусочками.",
       "Соедините овощи с нутом, добавьте оливковое масло и перемешайте."
+    ],
+    "equipmentCodes": [
+      "POT"
     ]
   },
   {
@@ -235,24 +442,51 @@
     "description": "Говядина, тушённая с булгуром, сладким перцем и овощами.",
     "preparationTimeMin": 95,
     "servings": 4,
-    "mealTypes": ["LUNCH", "DINNER"],
+    "mealTypes": [
+      "LUNCH",
+      "DINNER"
+    ],
     "sourceTitle": "Говядина с булгуром и овощами в казане — На ложке",
     "sourceUrl": "https://nalozhke.ru/говядина-с-булгуром-и-овощами-в-казане/",
     "adaptation": "Состав сокращён до базовых овощей SmartMeal, томаты представлены свежим помидором; специи оставлены на выбор.",
     "ingredients": [
-      {"productName": "Говядина постная сырая", "quantityG": 500},
-      {"productName": "Булгур сухой", "quantityG": 200},
-      {"productName": "Помидор", "quantityG": 300},
-      {"productName": "Перец сладкий", "quantityG": 150},
-      {"productName": "Морковь", "quantityG": 150},
-      {"productName": "Лук репчатый", "quantityG": 150},
-      {"productName": "Масло подсолнечное", "quantityG": 20}
+      {
+        "productName": "Говядина постная сырая",
+        "quantityG": 500
+      },
+      {
+        "productName": "Булгур сухой",
+        "quantityG": 200
+      },
+      {
+        "productName": "Помидор",
+        "quantityG": 300
+      },
+      {
+        "productName": "Перец сладкий",
+        "quantityG": 150
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 150
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 150
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 20
+      }
     ],
     "steps": [
       "Говядину нарежьте небольшими кусочками и обжарьте на разогретом масле до лёгкой корочки.",
       "Добавьте нарезанные лук и морковь, затем сладкий перец и помидоры. Готовьте ещё несколько минут.",
       "Влейте горячую воду так, чтобы она покрывала мясо, и тушите под крышкой 45–60 минут до мягкости.",
       "Добавьте промытый булгур и при необходимости ещё воды. Готовьте под крышкой до мягкости крупы."
+    ],
+    "equipmentCodes": [
+      "PAN"
     ]
   },
   {
@@ -262,25 +496,56 @@
     "description": "Густое рагу из куриного филе, нута, помидоров и овощей.",
     "preparationTimeMin": 75,
     "servings": 4,
-    "mealTypes": ["LUNCH", "DINNER"],
+    "mealTypes": [
+      "LUNCH",
+      "DINNER"
+    ],
     "sourceTitle": "Тушёная курица с нутом — Gastronom.ru",
     "sourceUrl": "https://www.gastronom.ru/recipe/63099/tushenaya-kurica-s-nutom",
     "adaptation": "Нут приведён к сухому весу до замачивания, набор овощей согласован со справочником SmartMeal.",
     "ingredients": [
-      {"productName": "Куриное филе сырое", "quantityG": 500},
-      {"productName": "Нут сухой", "quantityG": 140},
-      {"productName": "Помидор", "quantityG": 300},
-      {"productName": "Перец сладкий", "quantityG": 150},
-      {"productName": "Лук репчатый", "quantityG": 120},
-      {"productName": "Морковь", "quantityG": 120},
-      {"productName": "Чеснок", "quantityG": 10},
-      {"productName": "Масло подсолнечное", "quantityG": 15}
+      {
+        "productName": "Куриное филе сырое",
+        "quantityG": 500
+      },
+      {
+        "productName": "Нут сухой",
+        "quantityG": 140
+      },
+      {
+        "productName": "Помидор",
+        "quantityG": 300
+      },
+      {
+        "productName": "Перец сладкий",
+        "quantityG": 150
+      },
+      {
+        "productName": "Лук репчатый",
+        "quantityG": 120
+      },
+      {
+        "productName": "Морковь",
+        "quantityG": 120
+      },
+      {
+        "productName": "Чеснок",
+        "quantityG": 10
+      },
+      {
+        "productName": "Масло подсолнечное",
+        "quantityG": 15
+      }
     ],
     "steps": [
       "Нут замочите на ночь, промойте и заранее отварите почти до мягкости.",
       "Куриное филе нарежьте и быстро обжарьте на части масла, затем временно переложите на тарелку.",
       "В той же посуде готовьте нарезанные лук, морковь и перец. Добавьте чеснок и помидоры.",
       "Верните курицу, добавьте нут и немного воды. Тушите под крышкой до полной готовности мяса и нута."
+    ],
+    "equipmentCodes": [
+      "PAN",
+      "POT"
     ]
   }
 ]

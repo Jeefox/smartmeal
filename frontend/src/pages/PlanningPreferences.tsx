@@ -66,9 +66,12 @@ function LivePlanningPreferences() {
     setBusy(true);
     setMessage('');
     try {
-      await request('/me/planning-preferences', { method: 'PUT', body: JSON.stringify(draft) });
+      await request('/me/planning-preferences', {
+        method: 'PUT',
+        body: JSON.stringify({ ...draft, equipmentIds: null }),
+      });
       await client.invalidateQueries({ queryKey: ['planning-preferences', userId] });
-      setMessage('Ограничения сохранены. Создайте новый подбор с актуальными настройками.');
+      setMessage('Ограничения сохранены.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
@@ -79,7 +82,7 @@ function LivePlanningPreferences() {
     <>
       <PageHeading
         title="Ограничения для подбора"
-        description="Аллергии и исключения применяются ко всему рецепту. Неотмеченное оборудование не считается доступным."
+        description="Исключим неподходящие продукты из нового меню."
       />
       {(query.isPending || catalogues.isPending) && <Loading />}
       {(query.error || catalogues.error) && <Notice>Не удалось загрузить настройки.</Notice>}
@@ -101,21 +104,9 @@ function LivePlanningPreferences() {
               ))}
             </div>
           </fieldset>
-          <fieldset>
-            <legend>Доступное оборудование</legend>
-            <div className="period-checks">
-              {catalogues.data?.equipment.map((choice) => (
-                <label key={choice.id}>
-                  <input
-                    type="checkbox"
-                    checked={draft.equipmentIds.includes(choice.id)}
-                    onChange={(e) => toggle('equipmentIds', choice.id, e.target.checked)}
-                  />
-                  {choice.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <Link className="text-link" to="/profile/kitchen">
+            Кухонная техника →
+          </Link>
           <fieldset>
             <legend>Исключённые продукты</legend>
             <label>

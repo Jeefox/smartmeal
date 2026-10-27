@@ -6,19 +6,14 @@ import { CalendarDays, Leaf, PackageOpen, RefreshCw, ShoppingBasket } from 'luci
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { useApp, useOnline } from '../state';
 import { useSession } from '../session';
-import { recentPeriod } from '../period-shopping';
 import { ApiError } from '../api';
 import { labelDate, number, weekDates } from '../domain';
 import { periodErrors, readShoppingNeeds, shoppingKey } from '../shopping';
 import { Empty, Loading, Notice, PageHeading } from '../components/ui';
 export default function LiveShopping() {
-  const session = useSession(),
-    [params] = useSearchParams();
-  const recent = session.profile?.userId ? recentPeriod(session.profile.userId) : null;
-  if (recent && !params.has('from') && !params.has('to') && params.get('view') !== 'calendar')
-    return (
-      <Navigate replace to={`/menu-generation?id=${encodeURIComponent(recent.id)}&tab=shopping`} />
-    );
+  const [params] = useSearchParams();
+  if (!params.has('from') && !params.has('to') && !params.has('view'))
+    return <Navigate replace to="/shopping-lists" />;
   return <ShoppingByPeriod />;
 }
 function ShoppingByPeriod() {

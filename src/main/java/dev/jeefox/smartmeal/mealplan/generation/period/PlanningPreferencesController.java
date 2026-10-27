@@ -30,7 +30,7 @@ public class PlanningPreferencesController {
     public record Preferences(
             @NotNull @Size(max = 1000) List<@NotNull @Positive Long> allergenIds,
             @NotNull @Size(max = 1000) List<@NotNull @Positive Long> excludedProductIds,
-            @NotNull @Size(max = 1000) List<@NotNull @Positive Long> equipmentIds) {
+            @Size(max = 1000) List<@NotNull @Positive Long> equipmentIds) {
         @com.fasterxml.jackson.annotation.JsonIgnore
         @AssertTrue(message = "Списки ограничений не должны содержать дубли")
         public boolean isUnique() {
@@ -70,15 +70,78 @@ public class PlanningPreferencesController {
         var owner = users.findByEmailForUpdate(auth.getName()).orElseThrow();
         requireIds("allergens", preferences.allergenIds());
         requireIds("products", preferences.excludedProductIds());
-        requireIds("equipment", preferences.equipmentIds());
+        if (preferences.equipmentIds() != null) requireIds("equipment", preferences.equipmentIds());
         replace(owner.getId(), "user_allergies", "allergen_id", preferences.allergenIds());
         replace(
                 owner.getId(),
                 "user_excluded_products",
                 "product_id",
                 preferences.excludedProductIds());
-        replace(owner.getId(), "user_equipment", "equipment_id", preferences.equipmentIds());
+        if (preferences.equipmentIds() != null) {
+            replace(owner.getId(), "user_equipment", "equipment_id", preferences.equipmentIds());
+            markKitchenConfigured(owner.getId());
+        }
         return load(owner.getId());
+    }
+
+    public record KitchenChoice(Long id, String code, String name) {}
+
+    public record KitchenView(
+            boolean configured, List<Long> equipmentIds, List<KitchenChoice> available) {}
+
+    public record KitchenSelection(
+            @NotNull @Size(max = 100) List<@NotNull @Positive Long> equipmentIds) {
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        @AssertTrue(message = "Оборудование не должно повторяться")
+        public boolean isUnique() {
+            return equipmentIds == null
+                    || new HashSet<>(equipmentIds).size() == equipmentIds.size();
+        }
+    }
+
+    @GetMapping("/api/me/kitchen")
+    @Transactional(readOnly = true)
+    public KitchenView kitchen(Authentication auth) {
+        return loadKitchen(users.findByEmail(auth.getName()).orElseThrow().getId());
+    }
+
+    @PutMapping("/api/me/kitchen")
+    @Transactional
+    public KitchenView kitchen(
+            Authentication auth, @Valid @RequestBody KitchenSelection selection) {
+        var owner = users.findByEmailForUpdate(auth.getName()).orElseThrow();
+        requireIds("equipment", selection.equipmentIds());
+        replace(owner.getId(), "user_equipment", "equipment_id", selection.equipmentIds());
+        markKitchenConfigured(owner.getId());
+        return loadKitchen(owner.getId());
+    }
+
+    private void markKitchenConfigured(UUID user) {
+        jdbc.update(
+                "insert into user_kitchen_setup(user_id) values(:user) on conflict(user_id) do"
+                    + " nothing",
+                Map.of("user", user));
+    }
+
+    private KitchenView loadKitchen(UUID user) {
+        return new KitchenView(
+                Boolean.TRUE.equals(
+                        jdbc.queryForObject(
+                                "select exists(select 1 from user_kitchen_setup where"
+                                    + " user_id=:user)",
+                                Map.of("user", user),
+                                Boolean.class)),
+                jdbc.queryForList(
+                        "select equipment_id from user_equipment where user_id=:user order by"
+                            + " equipment_id",
+                        Map.of("user", user),
+                        Long.class),
+                jdbc.query(
+                        "select id,code,name from equipment order by id",
+                        Map.of(),
+                        (rs, n) ->
+                                new KitchenChoice(
+                                        rs.getLong(1), rs.getString(2), rs.getString(3))));
     }
 
     private void requireIds(String table, List<Long> ids) {
@@ -107,19 +170,19 @@ public class PlanningPreferencesController {
         var allergies =
                 jdbc.queryForList(
                         "select allergen_id from user_allergies where user_id=:user order by"
-                            + " allergen_id",
+                                + " allergen_id",
                         parameters,
                         Long.class);
         var equipment =
                 jdbc.queryForList(
                         "select equipment_id from user_equipment where user_id=:user order by"
-                            + " equipment_id",
+                                + " equipment_id",
                         parameters,
                         Long.class);
         var excluded =
                 jdbc.query(
                         "select p.id,p.name from user_excluded_products x join products p on"
-                            + " p.id=x.product_id where x.user_id=:user order by p.name,p.id",
+                                + " p.id=x.product_id where x.user_id=:user order by p.name,p.id",
                         parameters,
                         (rs, n) -> new Choice(rs.getLong(1), rs.getString(2)));
         return new PreferencesView(

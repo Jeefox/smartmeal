@@ -52,10 +52,12 @@ public class GenerationCommitService {
         var generation = store.owned(email, id, true);
         if (generation.getCommitKey() != null) {
             if (generation.getCommitKey().equals(key)) return generation.view();
-            throw PlanningException.conflict("Меню уже сохранено другим запросом");
+            throw PlanningException.conflict(
+                    "GENERATION_ALREADY_SAVED", "Меню уже сохранено другим запросом");
         }
         if (generations.findByUser_IdAndCommitKey(owner.getId(), key).isPresent())
             throw PlanningException.conflict(
+                    "IDEMPOTENCY_KEY_REUSED",
                     "Этот ключ сохранения уже использован для другого меню");
         GenerationStore.checkEditable(generation, request.expectedRevision());
         var document = generation.getDocument();
@@ -65,26 +67,31 @@ public class GenerationCommitService {
                         || document.pantryRevision() != context.pantry().revision()
                         || !context.pantry().today().equals(document.pantryAsOf())))
             throw PlanningException.conflict(
+                    "PANTRY_CHANGED",
                     "Запасы изменились. Обновите оценку покупок перед сохранением.");
         if (!context.fingerprint().equals(document.contextFingerprint()))
             throw PlanningException.conflict(
+                    "PLANNING_CONTEXT_CHANGED",
                     "Профиль, ограничения или рецепты изменились. Создайте новый подбор.");
         var checked =
                 evaluator.evaluate(
                         context, document.options(), document.entries(), document.searchStatus());
         if (checked.status().equals("NO_FEASIBLE_FOUND"))
-            throw PlanningException.conflict("Сначала заполните все дни меню");
+            throw PlanningException.conflict("MENU_INCOMPLETE", "Сначала заполните все дни меню");
         if (!checked.shopping().equals(document.shopping()))
             throw PlanningException.conflict(
+                    "SHOPPING_ESTIMATE_CHANGED",
                     "Оценка покупок изменилась. Пересоберите меню для проверки новых цен.");
         if (!checked.issues().isEmpty() && !request.acceptWarnings())
             throw PlanningException.conflict(
+                    "WARNINGS_NOT_ACCEPTED",
                     "Проверьте предупреждения и явно подтвердите сохранение с ними");
         var existing =
                 plans.findByUser_IdAndPlanDateBetweenOrderByPlanDateAsc(
                         owner.getId(), document.options().from(), document.options().to());
         if (!existing.isEmpty())
             throw PlanningException.conflict(
+                    "MEAL_PLAN_DATE_CONFLICT",
                     "На часть выбранных дат уже есть меню. Существующие планы не перезаписаны.");
         List<UUID> ids = new ArrayList<>();
         for (Day day : checked.days()) {

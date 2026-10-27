@@ -247,7 +247,8 @@ test('вход из меню сохраняет дату, мобильные н�
 }) => {
   await fixture(page);
   await page.goto('/?date=2026-10-21');
-  await page.getByRole('link', { name: 'Подобрать меню', exact: true }).click();
+  await page.getByText('Запасы и настройки дня', { exact: true }).click();
+  await page.getByRole('link', { name: 'Подобрать меню на один день', exact: true }).click();
   await expect(page.getByLabel('Дата меню', { exact: true })).toHaveValue('2026-10-21');
   await generate(page);
   for (const width of [360, 390, 768, 1440]) {

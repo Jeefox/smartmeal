@@ -1,3 +1,4 @@
+import { currentBoundary, assertBoundary } from './session-boundary';
 import type {
   Page,
   Product,
@@ -14,6 +15,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public fields: { field: string; message: string }[] = [],
+    public code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -27,6 +29,8 @@ export async function csrfHeaders(signal?: AbortSignal): Promise<Record<string, 
   return { [token.headerName]: token.token };
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const scope = currentBoundary();
+  const signal = options.signal ? AbortSignal.any([options.signal, scope.signal]) : scope.signal;
   const method = (options.method || 'GET').toUpperCase();
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -38,13 +42,15 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
         : 'application/json',
     );
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    const csrf = await csrfHeaders(options.signal ?? undefined);
+    const csrf = await csrfHeaders(signal);
     for (const [name, value] of Object.entries(csrf)) headers.set(name, value);
   }
+  assertBoundary(scope.epoch);
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
       ...options,
+      signal,
       credentials: 'same-origin',
       cache: 'no-store',
       headers,
@@ -59,9 +65,12 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     try {
       body = await response.json();
     } catch {
+      assertBoundary(scope.epoch);
+      if (signal.aborted) throw new DOMException('Request aborted', 'AbortError');
       if (response.ok) throw new ApiError(502, 'Сервер вернул некорректный JSON.');
     }
   }
+  assertBoundary(scope.epoch);
   if (!response.ok) {
     if (response.status === 401 && path !== '/auth/login' && typeof window !== 'undefined')
       window.dispatchEvent(new Event('smartmeal:unauthorized'));
@@ -72,13 +81,16 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
           : 'Войдите в аккаунт. Возможно, срок сессии истёк.'
         : response.status === 403
           ? 'Действие не разрешено. Обновите страницу и повторите вручную: возможно, CSRF-токен устарел.'
-          : response.status === 409
-            ? 'Изменение не выполнено из-за конфликта данных.'
-            : `Запрос не выполнен (${response.status}).`;
+          : response.status === 429
+            ? 'Слишком много запросов. Подождите минуту и повторите действие.'
+            : response.status === 409
+              ? 'Изменение не выполнено из-за конфликта данных.'
+              : `Запрос не выполнен (${response.status}).`;
     throw new ApiError(
       response.status,
       body?.detail || body?.title || fallback,
       Array.isArray(body?.errors) ? body.errors : [],
+      typeof body?.code === 'string' ? body.code : undefined,
     );
   }
   if (response.status === 204) return undefined as T;
@@ -122,7 +134,7 @@ export const api = {
     throw new ApiError(502, 'Сессия всё ещё активна. Выход не подтверждён.');
   },
   register: (email: string, password: string) =>
-    request<UserProfile>('/auth/register', {
+    request<void>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email: email.trim(), password }),
     }),

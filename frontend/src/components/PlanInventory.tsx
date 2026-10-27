@@ -1,3 +1,6 @@
+import { WeightCorrection, ConsumptionUndo, CorrectionHistory } from './CookingCorrections';
+import { readyComponents, useTodayCooking } from '../today-cooking';
+import PortionFeedback from './PortionFeedback';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -20,12 +23,33 @@ export default function PlanInventory({
     queryFn: ({ signal }) => pantryApi.states(plan.id, signal),
   });
   const [confirmation, setConfirmation] = useState(false);
+  const cooking = useTodayCooking(plan.planDate, plan.status !== 'DRAFT');
   const revision = query.data?.revision;
   const disabled = command.busy || !command.online || revision == null || query.isFetching;
   const entryControls = onlyEntry && query.data?.entries.find((s) => s.entryId === onlyEntry.id);
   if (onlyEntry) {
     const state = entryControls?.state,
       entry = onlyEntry;
+    const prepared = readyComponents(cooking.data, entry.id);
+    const pendingBatch = prepared.some(
+      (x) => x.allocation.status === 'ACTIVE' && x.batch.status === 'PLANNED',
+    );
+    const expiredBatch = prepared.some((x) => x.allocation.status === 'ACTIVE' && x.batch.expired);
+    const hasReady = prepared.some(
+      (x) => x.allocation.status === 'ACTIVE' && x.batch.status === 'COOKED' && !x.batch.expired,
+    );
+    const allComponentsReady =
+      !!entry.recipeSnapshot.components?.length &&
+      entry.recipeSnapshot.components.every((c) =>
+        prepared.some(
+          (x) =>
+            x.allocation.componentId === c.id &&
+            x.allocation.status === 'ACTIVE' &&
+            x.batch.status === 'COOKED' &&
+            !x.batch.expired,
+        ),
+      );
+    const eaten = prepared.some((x) => x.allocation.status === 'CONSUMED');
     return (
       <div
         className="plan-entry-inventory"
@@ -33,69 +57,142 @@ export default function PlanInventory({
       >
         <p className="caption">
           {state === 'DEDUCTED'
-            ? 'Ингредиенты списаны'
+            ? eaten
+              ? 'Отмечено съеденным'
+              : 'Готово к подаче · ингредиенты списаны'
             : state === 'SKIPPED'
               ? 'Блюдо пропущено'
               : 'Приготовление не отмечено'}
         </p>
+        {pendingBatch && (
+          <p className="caption">
+            Сначала приготовьте общую партию в блоке «Что приготовить» выше.
+          </p>
+        )}
+        {expiredBatch && (
+          <p className="caption">
+            У готового компонента истекла указанная дата хранения.{' '}
+            <Link to="/cooking">Проверить остатки</Link>
+          </p>
+        )}
         {command.message && <Notice>{command.message}</Notice>}
         <div className="period-actions">
           {plan.status === 'CONFIRMED' && state === 'OPEN' && (
             <>
               <button
                 className="button primary"
-                disabled={disabled || plan.planDate > (query.data?.today || dateKey(new Date()))}
+                disabled={
+                  disabled ||
+                  pendingBatch ||
+                  expiredBatch ||
+                  plan.planDate > (query.data?.today || dateKey(new Date()))
+                }
                 onClick={() =>
                   command.run(`/me/meal-plan-entries/${entry.id}/ingredient-usage`, {
                     expectedRevision: revision,
                   })
                 }
               >
-                Приготовил
+                {allComponentsReady
+                  ? 'Подать блюдо'
+                  : hasReady
+                    ? 'Приготовил остальное'
+                    : 'Приготовил'}
               </button>
+            </>
+          )}
+          {state === 'DEDUCTED' && hasReady && (
+            <button
+              className="button primary"
+              disabled={
+                disabled ||
+                pendingBatch ||
+                expiredBatch ||
+                cooking.isFetching ||
+                cooking.data?.revision == null
+              }
+              onClick={() =>
+                command.run(`/me/cooking-batches/entries/${entry.id}/consume`, {
+                  expectedRevision: cooking.data!.revision,
+                })
+              }
+            >
+              Съедено
+            </button>
+          )}
+          <details className="today-other-actions">
+            <summary>Другие действия</summary>
+            {eaten && cooking.data && (
+              <ConsumptionUndo
+                entryId={entry.id}
+                revision={cooking.data.revision}
+                available={prepared
+                  .filter((x) => x.allocation.status === 'CONSUMED')
+                  .every((x) => x.batch.status === 'COOKED')}
+              />
+            )}
+            {cooking.data &&
+              [...new Map(prepared.map((x) => [x.batch.id, x.batch])).values()].map((b) => (
+                <div key={b.id}>
+                  <p className="caption">{b.name}</p>
+                  {b.status === 'COOKED' && b.actualYieldG != null && (
+                    <WeightCorrection
+                      batchId={b.id}
+                      weight={b.actualYieldG}
+                      revision={cooking.data!.revision}
+                    />
+                  )}
+                  <CorrectionHistory batchId={b.id} />
+                </div>
+              ))}
+            {plan.status === 'CONFIRMED' && state === 'OPEN' && (
+              <>
+                {' '}
+                <button
+                  className="button quiet"
+                  disabled={disabled}
+                  onClick={() =>
+                    command.run(
+                      `/me/meal-plan-entries/${entry.id}/inventory-state`,
+                      { expectedRevision: revision, state: 'SKIPPED' },
+                      'PUT',
+                    )
+                  }
+                >
+                  Пропустить
+                </button>
+              </>
+            )}
+            {state === 'DEDUCTED' && !eaten && (
+              <button
+                className="button quiet"
+                disabled={disabled}
+                onClick={() =>
+                  command.run(`/me/meal-plan-entries/${entry.id}/ingredient-usage/reversal`, {
+                    expectedRevision: revision,
+                  })
+                }
+              >
+                Отменить ошибочное списание
+              </button>
+            )}
+            {plan.status === 'CONFIRMED' && state === 'SKIPPED' && (
               <button
                 className="button quiet"
                 disabled={disabled}
                 onClick={() =>
                   command.run(
                     `/me/meal-plan-entries/${entry.id}/inventory-state`,
-                    { expectedRevision: revision, state: 'SKIPPED' },
+                    { expectedRevision: revision, state: 'OPEN' },
                     'PUT',
                   )
                 }
               >
-                Пропустить
+                Вернуть блюдо
               </button>
-            </>
-          )}
-          {state === 'DEDUCTED' && (
-            <button
-              className="button quiet"
-              disabled={disabled}
-              onClick={() =>
-                command.run(`/me/meal-plan-entries/${entry.id}/ingredient-usage/reversal`, {
-                  expectedRevision: revision,
-                })
-              }
-            >
-              Отменить ошибочное списание
-            </button>
-          )}
-          {plan.status === 'CONFIRMED' && state === 'SKIPPED' && (
-            <button
-              className="button quiet"
-              disabled={disabled}
-              onClick={() =>
-                command.run(
-                  `/me/meal-plan-entries/${entry.id}/inventory-state`,
-                  { expectedRevision: revision, state: 'OPEN' },
-                  'PUT',
-                )
-              }
-            >
-              Вернуть блюдо
-            </button>
-          )}
+            )}
+            {state === 'DEDUCTED' && <PortionFeedback entry={entry} />}
+          </details>
         </div>
       </div>
     );
@@ -105,6 +202,7 @@ export default function PlanInventory({
       <div className="period-actions">
         <h2>Ингредиенты и запасы</h2>
         <Link to="/pantry">Открыть запасы</Link>
+        <Link to="/cooking">Готовить на несколько дней · готовые остатки</Link>
       </div>
       <p className="muted">
         Подтверждение меню резервирует продукты. «Приготовил» списывает сырые ингредиенты; это не
@@ -128,7 +226,9 @@ export default function PlanInventory({
           className="button secondary"
           disabled={disabled}
           onClick={() =>
-            command.run(`/me/meal-plans/${plan.id}/reopen`, { expectedRevision: revision })
+            command.run(`/me/meal-plans/${plan.id}/reopen`, {
+              expectedRevision: revision,
+            })
           }
         >
           Восстановить в черновик

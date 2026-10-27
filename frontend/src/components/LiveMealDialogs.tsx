@@ -1,3 +1,4 @@
+import MealComposition from './MealComposition';
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -259,10 +260,15 @@ export function SnapshotDialog({ entry, onClose }: { entry: MealPlanEntry; onClo
   const snapshot = entry.recipeSnapshot;
   return (
     <Dialog title={snapshot.name} onClose={onClose} wide>
+      <MealComposition recipe={entry.recipeSnapshot} people={entry.personPortions || []} />
       <Notice>Снимок блюда в меню. Изменения исходного рецепта не меняют эти данные.</Notice>
       <p className="muted">{snapshot.description}</p>
       <Meta recipe={snapshotRecipe(snapshot)} />
-      <h3>Выбрано порций: {entry.portions}</h3>
+      <h3>
+        {snapshot.components?.length
+          ? 'Общее количество для приготовления по меню'
+          : `Выбрано порций: ${entry.portions}`}
+      </h3>
       <NutritionValues nutrition={entry.nutrition} label="КБЖУ выбранных порций · расчёт сервера" />
       <h3>Состав исходного рецепта · {snapshot.servings} порц.</h3>
       <ul className="ingredient-list">

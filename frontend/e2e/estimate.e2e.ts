@@ -145,7 +145,7 @@ test('смена сети/точки/периода не показывает ч
   page,
 }) => {
   const state = await fixture(page);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await choose(page);
   await expect(page.locator('.estimate-total')).toBeVisible();
   await page.getByRole('button', { name: /Сеть API.*Второй адрес/ }).click();
@@ -173,7 +173,7 @@ test('смена сети/точки/периода не показывает ч
 });
 test('400/404/409 и сетевой сбой не маскируются, 401 завершает сессию', async ({ page }) => {
   const state = await fixture(page);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   state.status = 400;
   await choose(page);
   await expect(page.locator('.estimate-error')).toContainText('Проверьте параметры');
@@ -199,7 +199,7 @@ test('400/404/409 и сетевой сбой не маскируются, 401 з
 });
 test('расчёт на телефоне без горизонтального переполнения', async ({ page }) => {
   await fixture(page);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await choose(page);
   await expect(page.locator('.estimate-total')).toBeVisible();
   for (const width of [360, 390, 768, 1440]) {
@@ -226,7 +226,7 @@ test('каталожный ориентир даёт ненулевую оцен
   const state = await fixture(page);
   state.reference = true;
   state.complete = true;
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await choose(page);
   await expect(
     page.getByText('Предварительная стоимость с ориентирами', { exact: true }),
@@ -247,7 +247,7 @@ test('весовой ориентир в смете показывает цен�
   state.reference = true;
   state.weighted = true;
   state.complete = true;
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await choose(page);
   await expect(page.getByText(/1\s?250,55 г · на вес/)).toBeVisible();
   await expect(page.getByText(/100,25.*\/ кг/)).toBeVisible();

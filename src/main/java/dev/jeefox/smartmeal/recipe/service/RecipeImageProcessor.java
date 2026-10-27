@@ -1,10 +1,10 @@
 package dev.jeefox.smartmeal.recipe.service;
 
 import dev.jeefox.smartmeal.exception.InvalidRecipeImageException;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -13,13 +13,15 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import javax.imageio.ImageIO;
+
 @Component
 public class RecipeImageProcessor {
     static final long MAX_UPLOAD_BYTES = 10L * 1024 * 1024;
     static final long MAX_PIXELS = 24_000_000L;
     static final int MAX_SIDE = 1600;
 
-    public ProcessedImage process(MultipartFile file) {
+    public synchronized ProcessedImage process(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new InvalidRecipeImageException("Выберите непустой файл изображения");
         }
@@ -29,15 +31,33 @@ public class RecipeImageProcessor {
 
         try {
             byte[] source = file.getBytes();
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(source));
-            if (image == null) {
-                throw new InvalidRecipeImageException("Поддерживаются изображения JPEG и PNG");
-            }
-            if ((long) image.getWidth() * image.getHeight() > MAX_PIXELS) {
-                throw new InvalidRecipeImageException("Разрешение изображения слишком большое");
+            BufferedImage image;
+            try (var input =
+                    new javax.imageio.stream.MemoryCacheImageInputStream(
+                            new ByteArrayInputStream(source))) {
+                var readers = ImageIO.getImageReaders(input);
+                if (!readers.hasNext())
+                    throw new InvalidRecipeImageException("Поддерживаются изображения JPEG и PNG");
+                var reader = readers.next();
+                try {
+                    String format = reader.getFormatName();
+                    if (!format.equalsIgnoreCase("JPEG") && !format.equalsIgnoreCase("PNG"))
+                        throw new InvalidRecipeImageException(
+                                "Поддерживаются изображения JPEG и PNG");
+                    reader.setInput(input, true, true);
+                    int width = reader.getWidth(0), height = reader.getHeight(0);
+                    if (width <= 0 || height <= 0 || (long) width * height > MAX_PIXELS)
+                        throw new InvalidRecipeImageException(
+                                "Разрешение изображения слишком большое");
+                    image = reader.read(0);
+                } finally {
+                    reader.dispose();
+                }
             }
 
-            double scale = Math.min(1.0, (double) MAX_SIDE / Math.max(image.getWidth(), image.getHeight()));
+            double scale =
+                    Math.min(
+                            1.0, (double) MAX_SIDE / Math.max(image.getWidth(), image.getHeight()));
             int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
             int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
             BufferedImage normalized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -45,10 +65,11 @@ public class RecipeImageProcessor {
             try {
                 graphics.setColor(Color.WHITE);
                 graphics.fillRect(0, 0, width, height);
-                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                graphics.setRenderingHint(
+                        RenderingHints.KEY_INTERPOLATION,
                         RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                graphics.setRenderingHint(RenderingHints.KEY_RENDERING,
-                        RenderingHints.VALUE_RENDER_QUALITY);
+                graphics.setRenderingHint(
+                        RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 graphics.drawImage(image, 0, 0, width, height, null);
             } finally {
                 graphics.dispose();
@@ -56,7 +77,8 @@ public class RecipeImageProcessor {
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             if (!ImageIO.write(normalized, "jpeg", output)) {
-                throw new InvalidRecipeImageException("Не удалось преобразовать изображение в JPEG");
+                throw new InvalidRecipeImageException(
+                        "Не удалось преобразовать изображение в JPEG");
             }
             return new ProcessedImage(output.toByteArray(), "image/jpeg", width, height);
         } catch (InvalidRecipeImageException exception) {
@@ -66,6 +88,5 @@ public class RecipeImageProcessor {
         }
     }
 
-    public record ProcessedImage(byte[] content, String contentType, int width, int height) {
-    }
+    public record ProcessedImage(byte[] content, String contentType, int width, int height) {}
 }

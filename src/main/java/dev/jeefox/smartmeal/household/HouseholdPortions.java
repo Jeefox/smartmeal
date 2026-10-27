@@ -14,6 +14,26 @@ public final class HouseholdPortions {
     public static List<PersonPortion> allocate(
             BigDecimal portions, RecipeSnapshot recipe, List<Participant> people) {
         if (people.isEmpty()) return List.of();
+        if (!recipe.components().isEmpty())
+            return people.stream()
+                    .map(
+                            p -> {
+                                var n =
+                                        dev.jeefox.smartmeal.mealplan.balanced.CompositeMeals
+                                                .forPerson(recipe, p.id())
+                                                .scaled(portions);
+                                return new PersonPortion(
+                                        p.id(),
+                                        p.name(),
+                                        recipe.nutritionTotal().calories().signum() == 0
+                                                ? BigDecimal.ZERO
+                                                : n.calories()
+                                                        .divide(
+                                                                recipe.nutritionTotal().calories(),
+                                                                MathContext.DECIMAL128),
+                                        n.rounded());
+                            })
+                    .toList();
         int target = people.stream().mapToInt(Participant::dailyCalorieTarget).sum();
         List<PersonPortion> result = new ArrayList<>();
         BigDecimal left = portions;
@@ -30,14 +50,7 @@ public final class HouseholdPortions {
                     share.divide(BigDecimal.valueOf(recipe.servings()), MathContext.DECIMAL128);
             result.add(
                     new PersonPortion(
-                            person.id(),
-                            person.name(),
-                            share,
-                            new NutritionValues(
-                                    round(n.calories().multiply(ratio)),
-                                    round(n.protein().multiply(ratio)),
-                                    round(n.fat().multiply(ratio)),
-                                    round(n.carbs().multiply(ratio)))));
+                            person.id(), person.name(), share, n.scaled(ratio).rounded()));
         }
         return List.copyOf(result);
     }
@@ -60,7 +73,15 @@ public final class HouseholdPortions {
                                             sum(values, 0),
                                             sum(values, 1),
                                             sum(values, 2),
-                                            sum(values, 3)));
+                                            sum(values, 3),
+                                            values.stream()
+                                                    .map(NutritionValues::knownFiber)
+                                                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                                                    .setScale(2, RoundingMode.HALF_UP),
+                                            values.stream()
+                                                    .allMatch(NutritionValues::fiberComplete)),
+                                    p.proteinTargetG(),
+                                    p.fiberTargetG());
                         })
                 .toList();
     }

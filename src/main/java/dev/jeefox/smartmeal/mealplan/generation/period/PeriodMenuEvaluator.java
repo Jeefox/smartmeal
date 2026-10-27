@@ -2,6 +2,7 @@ package dev.jeefox.smartmeal.mealplan.generation.period;
 
 import static dev.jeefox.smartmeal.mealplan.generation.period.PlanningModels.*;
 
+import dev.jeefox.smartmeal.mealplan.balanced.BalancedModels.Role;
 import dev.jeefox.smartmeal.mealplan.entity.MealType;
 import dev.jeefox.smartmeal.mealplan.snapshot.RecipeSnapshotFingerprint;
 import dev.jeefox.smartmeal.nutrition.dto.NutritionValues;
@@ -101,6 +102,14 @@ public class PeriodMenuEvaluator {
                     context.candidates().getOrDefault(entry.mealType(), List.of()).stream()
                             .anyMatch(
                                     c -> c.snapshot().recipeId().equals(entry.recipe().recipeId()));
+            if (options.balancedMeals()) {
+                dev.jeefox.smartmeal.mealplan.balanced.CompositeMeals.validate(
+                        context, options, entry);
+                if (!canAdd(checked, candidate, entry.date(), options))
+                    throw PlanningException.conflict("Нарушены правила повторов");
+                checked.add(entry);
+                continue;
+            }
             if (!eligible
                     || candidate.portions().stream()
                             .noneMatch(p -> p.compareTo(entry.portions()) == 0)
@@ -127,6 +136,25 @@ public class PeriodMenuEvaluator {
                                                     BigDecimal.valueOf(context.target())
                                                             .multiply(new BigDecimal("0.10")))
                                     <= 0;
+            if (options.balancedMeals())
+                for (var p : people) {
+                    var n =
+                            dev.jeefox.smartmeal.nutrition.dto.NutritionValues.sum(
+                                    dayEntries.stream()
+                                            .map(
+                                                    e ->
+                                                            dev.jeefox.smartmeal.mealplan.balanced
+                                                                    .CompositeMeals.forPerson(
+                                                                    e.recipe(), p.id()))
+                                            .toList());
+                    if (n.calories()
+                                    .subtract(BigDecimal.valueOf(p.dailyCalorieTarget()))
+                                    .abs()
+                                    .compareTo(
+                                            BigDecimal.valueOf(p.dailyCalorieTarget())
+                                                    .multiply(new BigDecimal("0.10")))
+                            > 0) fit = false;
+                }
             days.add(
                     new Day(
                             date,
@@ -161,10 +189,55 @@ public class PeriodMenuEvaluator {
                                 "У использованных домашних запасов не указан срок годности."
                                         + " Проверьте их перед приготовлением."));
         }
+        boolean groceriesFit = GroceryPolicy.fits(options, shopping);
+        if (!groceriesFit)
+            issues.add(
+                    new Issue(
+                            "SHOPPING_PRODUCT_LIMIT",
+                            "Нужно купить разных продуктов: "
+                                    + GroceryPolicy.count(shopping)
+                                    + ", заданный максимум: "
+                                    + options.maxShoppingProducts()
+                                    + ". Пересоберите меню с общими ингредиентами или измените"
+                                    + " предел покупок."));
         boolean full = entries.size() == days.size() * 3;
+        if (!full && options.maxShoppingProducts() != null)
+            issues.add(
+                    new Issue(
+                            "COMPACT_BASKET_SEARCH",
+                            "При ограничении до "
+                                    + options.maxShoppingProducts()
+                                    + " продуктов не найдено полного меню в рамках текущего поиска."
+                                    + " Увеличьте предел до 10, разрешите больше повторов блюд или"
+                                    + " добавьте рецепты с общими ингредиентами. Это не"
+                                    + " доказательство невозможности такого меню."));
         if (!full)
             for (var meal : MEALS) {
-                int available = context.candidates().getOrDefault(meal, List.of()).size();
+                var pool = context.candidates().getOrDefault(meal, List.of());
+                int available =
+                        (int)
+                                pool.stream()
+                                        .filter(
+                                                c ->
+                                                        !options.balancedMeals()
+                                                                || isMainWithYield(context, c))
+                                        .count();
+                long missingProfiles = pool.stream().filter(c -> missingYield(context, c)).count();
+                if (options.balancedMeals() && missingProfiles > 0)
+                    issues.add(
+                            new Issue(
+                                    "MISSING_YIELD_" + meal,
+                                    "Для "
+                                            + missingProfiles
+                                            + " рецептов ("
+                                            + switch (meal) {
+                                                case BREAKFAST -> "завтрак";
+                                                case LUNCH -> "обед";
+                                                default -> "ужин";
+                                            }
+                                            + ") не указан выход готового блюда. Заполните выход в"
+                                            + " настройках рецептов; такие блюда исключены из"
+                                            + " нового подбора."));
                 long needed =
                         (days.size() + options.maxRecipeOccurrences() - 1)
                                 / options.maxRecipeOccurrences();
@@ -225,6 +298,62 @@ public class PeriodMenuEvaluator {
                             "SEARCH_LIMIT",
                             "Достигнут лимит поиска. Можно попробовать другой вариант; глобальный"
                                     + " минимум не гарантируется."));
+        if (options.balancedMeals()) {
+            for (var p : people) {
+                var t = context.balanced().targets().get(p.id());
+                if (t == null || t.proteinTargetG() == null || t.fiberTargetG() == null)
+                    issues.add(
+                            new Issue(
+                                    "NUTRIENT_TARGETS_UNSET",
+                                    "Для "
+                                            + p.name()
+                                            + " не все цели белка и клетчатки настроены"));
+            }
+            for (var day : days)
+                for (var p : people) {
+                    var n =
+                            dev.jeefox.smartmeal.nutrition.dto.NutritionValues.sum(
+                                    day.entries().stream()
+                                            .map(
+                                                    e ->
+                                                            dev.jeefox.smartmeal.mealplan.balanced
+                                                                    .CompositeMeals.forPerson(
+                                                                    e.recipe(), p.id()))
+                                            .toList());
+                    var t = context.balanced().targets().get(p.id());
+                    if (!n.fiberComplete())
+                        issues.add(
+                                new Issue(
+                                        "FIBER_DATA_INCOMPLETE",
+                                        day.date()
+                                                + ", "
+                                                + p.name()
+                                                + ": данные клетчатки неполные; известная часть "
+                                                + n.knownFiber().setScale(1, RoundingMode.HALF_UP)
+                                                + " г"));
+                    if (t != null
+                            && t.proteinTargetG() != null
+                            && n.protein().compareTo(t.proteinTargetG()) < 0)
+                        issues.add(
+                                new Issue(
+                                        "PROTEIN_TARGET_NOT_REACHED",
+                                        day.date()
+                                                + ", "
+                                                + p.name()
+                                                + ": не достигнута цель белка"));
+                    if (t != null
+                            && t.fiberTargetG() != null
+                            && n.fiberComplete()
+                            && n.knownFiber().compareTo(t.fiberTargetG()) < 0)
+                        issues.add(
+                                new Issue(
+                                        "FIBER_TARGET_NOT_REACHED",
+                                        day.date()
+                                                + ", "
+                                                + p.name()
+                                                + ": не достигнута цель клетчатки"));
+                }
+        }
         return new Document(
                 options,
                 context.target(),
@@ -234,17 +363,45 @@ public class PeriodMenuEvaluator {
                 List.copyOf(days),
                 shopping,
                 List.copyOf(issues),
-                !full ? "NO_FEASIBLE_FOUND" : issues.isEmpty() ? "READY" : "READY_WITH_WARNINGS",
+                !full || !groceriesFit
+                        ? "NO_FEASIBLE_FOUND"
+                        : issues.isEmpty() ? "READY" : "READY_WITH_WARNINGS",
                 searchStatus,
-                "period-beam-v2-pantry",
+                options.balancedMeals() ? "balanced-composite-v1" : "period-beam-v2-pantry",
                 options.usePantry() ? context.pantry().revision() : null,
                 options.usePantry() ? context.pantry().today() : null,
                 people);
     }
 
+    private static boolean missingYield(PlanningContext context, Candidate candidate) {
+        var profile = context.balanced().profiles().get(candidate.snapshot().recipeId());
+        return profile == null || profile.cookedYieldG() == null;
+    }
+
+    private static boolean isMainWithYield(PlanningContext context, Candidate candidate) {
+        if (missingYield(context, candidate)) return false;
+        var role = context.balanced().profiles().get(candidate.snapshot().recipeId()).role();
+        return Set.of(Role.COMPLETE_MAIN, Role.BREAKFAST, Role.SOUP, Role.PROTEIN_MAIN)
+                .contains(role);
+    }
+
     public NutritionValues nutrition(List<Selection> entries) {
-        return new NutritionValues(
-                sum(entries, 0), sum(entries, 1), sum(entries, 2), sum(entries, 3));
+        return NutritionValues.sum(
+                        entries.stream()
+                                .map(
+                                        e ->
+                                                e.recipe()
+                                                        .nutritionTotal()
+                                                        .scaled(
+                                                                e.portions()
+                                                                        .divide(
+                                                                                BigDecimal.valueOf(
+                                                                                        e.recipe()
+                                                                                                .servings()),
+                                                                                MathContext
+                                                                                        .DECIMAL128)))
+                                .toList())
+                .rounded();
     }
 
     private BigDecimal sum(List<Selection> entries, int field) {

@@ -16,9 +16,38 @@ public record UserProfileResponse(
         Integer heightCm,
         BigDecimal weightKg,
         ActivityLevel activityLevel,
-        Goal goal
-) {
-    public static UserProfileResponse from(UserProfile profile){
+        Goal goal,
+        boolean canEditCatalogue,
+        boolean equipmentConfigured) {
+    public UserProfileResponse withCataloguePermission(boolean allowed) {
+        return new UserProfileResponse(
+                userId,
+                dailyCalorieTarget,
+                age,
+                sex,
+                heightCm,
+                weightKg,
+                activityLevel,
+                goal,
+                allowed,
+                equipmentConfigured);
+    }
+
+    public UserProfileResponse withKitchenConfigured(boolean configured) {
+        return new UserProfileResponse(
+                userId,
+                dailyCalorieTarget,
+                age,
+                sex,
+                heightCm,
+                weightKg,
+                activityLevel,
+                goal,
+                canEditCatalogue,
+                configured);
+    }
+
+    public static UserProfileResponse from(UserProfile profile) {
         return new UserProfileResponse(
                 profile.getUserId(),
                 profile.getDailyCalorieTarget(),
@@ -27,7 +56,8 @@ public record UserProfileResponse(
                 profile.getHeightCm(),
                 profile.getWeightKg(),
                 profile.getActivityLevel(),
-                profile.getGoal()
-        );
+                profile.getGoal(),
+                false,
+                false);
     }
 }

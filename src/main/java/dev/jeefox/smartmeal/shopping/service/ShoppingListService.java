@@ -70,7 +70,7 @@ public class ShoppingListService {
         boolean containsDrafts =
                 plans.stream().anyMatch(plan -> plan.getStatus() == MealPlanStatus.DRAFT);
 
-        if (plans.isEmpty()) {
+        if (plans.isEmpty() && pantry == null) {
             return new ShoppingListResponse(from, to, false, List.of());
         }
 
@@ -98,58 +98,33 @@ public class ShoppingListService {
                             entry.getMealType().ordinal() * 100000 + entry.getPosition(),
                             entry.getRecipeSnapshot(),
                             entry.getPortions()));
+        if (pantry != null)
+            demands = new ArrayList<>(pantry.cookingDemand(email, demands, from, to));
         Map<Long, BigDecimal> coverage = new HashMap<>();
         if (pantry != null) {
             var stock =
                     pantry.snapshot(
                             email,
-                            entries.stream()
-                                    .map(MealPlanEntry::getId)
+                            demands.stream()
+                                    .map(d -> UUID.fromString(d.entryId()))
                                     .collect(java.util.stream.Collectors.toSet()));
             var protectedIds =
                     entries.stream()
                             .filter(e -> e.getMealPlan().getStatus() == MealPlanStatus.CONFIRMED)
                             .map(e -> e.getId().toString())
                             .collect(java.util.stream.Collectors.toSet());
-            var confirmedAllocation =
-                    dev.jeefox.smartmeal.pantry.PantryAllocationCalculator.allocate(
-                            demands.stream()
-                                    .filter(d -> protectedIds.contains(d.entryId()))
-                                    .toList(),
-                            stock);
-            Map<UUID, BigDecimal> used = new HashMap<>();
-            confirmedAllocation
-                    .allocations()
-                    .forEach(a -> used.merge(a.lotId(), a.quantityG(), BigDecimal::add));
-            coverage.putAll(confirmedAllocation.coveredG());
-            var remainder =
-                    new dev.jeefox.smartmeal.pantry.PantryModels.Snapshot(
-                            stock.revision(),
-                            stock.today(),
-                            stock.lots().stream()
-                                    .map(
-                                            l ->
-                                                    new dev.jeefox.smartmeal.pantry.PantryModels
-                                                            .StockLot(
-                                                            l.id(),
-                                                            l.productId(),
-                                                            l.quantityG()
-                                                                    .subtract(
-                                                                            used.getOrDefault(
-                                                                                    l.id(),
-                                                                                    BigDecimal
-                                                                                            .ZERO)),
-                                                            l.receivedOn(),
-                                                            l.expiresOn(),
-                                                            l.createdAt()))
-                                    .toList());
-            var draftAllocation =
-                    dev.jeefox.smartmeal.pantry.PantryAllocationCalculator.allocate(
-                            demands.stream()
-                                    .filter(d -> !protectedIds.contains(d.entryId()))
-                                    .toList(),
-                            remainder);
-            draftAllocation.coveredG().forEach((id, q) -> coverage.merge(id, q, BigDecimal::add));
+            var normalIds =
+                    entries.stream()
+                            .map(e -> e.getId().toString())
+                            .collect(java.util.stream.Collectors.toSet());
+            demands.stream()
+                    .map(d -> d.entryId())
+                    .filter(id -> !normalIds.contains(id))
+                    .forEach(protectedIds::add);
+            coverage.putAll(
+                    dev.jeefox.smartmeal.pantry.PantryAllocationCalculator.allocatePrioritized(
+                                    demands, stock, protectedIds)
+                            .coveredG());
         }
 
         // Вспомогательный тип, доступный только внутри этого метода.
@@ -187,8 +162,10 @@ public class ShoppingListService {
             }
         }
 
-        for (var demand : demands)
+        for (var demand : demands) {
             quantities.merge(demand.productId(), demand.quantityG(), BigDecimal::add);
+            labels.putIfAbsent(demand.productId(), new ProductLabel(demand.name(), demand.date()));
+        }
         List<ShoppingListItemResponse> items =
                 quantities.entrySet().stream()
                         .map(

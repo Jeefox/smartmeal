@@ -18,6 +18,50 @@ public final class PantryAllocationCalculator {
             Map<Long, BigDecimal> shortageG,
             boolean unknownExpiry) {}
 
+    public static Result allocatePrioritized(
+            List<Demand> demands, Snapshot snapshot, Set<String> priority) {
+        var first =
+                allocate(
+                        demands.stream().filter(d -> priority.contains(d.entryId())).toList(),
+                        snapshot);
+        var used = new HashMap<UUID, BigDecimal>();
+        first.allocations().forEach(a -> used.merge(a.lotId(), a.quantityG(), BigDecimal::add));
+        var remainder =
+                new Snapshot(
+                        snapshot.revision(),
+                        snapshot.today(),
+                        snapshot.lots().stream()
+                                .map(
+                                        l ->
+                                                new StockLot(
+                                                        l.id(),
+                                                        l.productId(),
+                                                        l.quantityG()
+                                                                .subtract(
+                                                                        used.getOrDefault(
+                                                                                l.id(),
+                                                                                BigDecimal.ZERO)),
+                                                        l.receivedOn(),
+                                                        l.expiresOn(),
+                                                        l.createdAt()))
+                                .toList());
+        var second =
+                allocate(
+                        demands.stream().filter(d -> !priority.contains(d.entryId())).toList(),
+                        remainder);
+        var allocations = new ArrayList<>(first.allocations());
+        allocations.addAll(second.allocations());
+        var covered = new TreeMap<>(first.coveredG());
+        second.coveredG().forEach((p, q) -> covered.merge(p, q, BigDecimal::add));
+        var shortage = new TreeMap<>(first.shortageG());
+        second.shortageG().forEach((p, q) -> shortage.merge(p, q, BigDecimal::add));
+        return new Result(
+                List.copyOf(allocations),
+                Map.copyOf(covered),
+                Map.copyOf(shortage),
+                first.unknownExpiry() || second.unknownExpiry());
+    }
+
     public static Result allocate(List<Demand> demands, Snapshot snapshot) {
         var lots =
                 snapshot.lots().stream()

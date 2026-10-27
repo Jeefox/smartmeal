@@ -1,11 +1,19 @@
 package dev.jeefox.smartmeal.recipe.controller;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import dev.jeefox.smartmeal.mealplan.entity.MealType;
 import dev.jeefox.smartmeal.product.entity.Product;
 import dev.jeefox.smartmeal.product.entity.ProductCategory;
 import dev.jeefox.smartmeal.recipe.entity.Recipe;
 import dev.jeefox.smartmeal.recipe.entity.RecipeIngredient;
+
 import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,12 +30,6 @@ import org.springframework.web.context.WebApplicationContext;
 import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @Transactional
@@ -48,7 +50,15 @@ class RecipeCandidatesIntegrationTest {
         tag = "CAND_" + UUID.randomUUID();
         ProductCategory category = new ProductCategory(tag, "Тест");
         em.persist(category);
-        product = new Product(category, "Продукт", null, 100, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE);
+        product =
+                new Product(
+                        category,
+                        "Продукт",
+                        null,
+                        100,
+                        BigDecimal.ONE,
+                        BigDecimal.ONE,
+                        BigDecimal.ONE);
         em.persist(product);
         quick = recipe("A завтрак", 10, true, MealType.BREAKFAST);
         boundary = recipe("B завтрак-перекус", 15, true, MealType.BREAKFAST, MealType.SNACK);
@@ -63,7 +73,8 @@ class RecipeCandidatesIntegrationTest {
 
     @Test
     void excludesSlowWrongMealUnclassifiedAndEmptyRecipes() throws Exception {
-        mvc.perform(candidates("BREAKFAST", "15")).andExpect(status().isOk())
+        mvc.perform(candidates("BREAKFAST", "15"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[0].id").value(quick.getId().toString()))
                 .andExpect(jsonPath("$.content[1].id").value(boundary.getId().toString()))
@@ -73,10 +84,12 @@ class RecipeCandidatesIntegrationTest {
 
     @Test
     void supportsMultipleMealTypesAndZeroTime() throws Exception {
-        mvc.perform(candidates("DINNER", "10")).andExpect(status().isOk())
+        mvc.perform(candidates("DINNER", "10"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(soup.getId().toString()));
-        mvc.perform(candidates("SNACK", "0")).andExpect(status().isOk())
+        mvc.perform(candidates("SNACK", "0"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].preparationTimeMin").value(0));
     }
@@ -84,11 +97,13 @@ class RecipeCandidatesIntegrationTest {
     @Test
     void paginatesWithoutDuplicatesForMultiTypeRecipe() throws Exception {
         mvc.perform(candidates("BREAKFAST", "15").param("page", "1").param("size", "1"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2))
                 .andExpect(jsonPath("$.content[0].id").value(boundary.getId().toString()));
         mvc.perform(candidates("BREAKFAST", "15").param("page", "2").param("size", "1"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
     }
 
     @Test
@@ -96,72 +111,123 @@ class RecipeCandidatesIntegrationTest {
         recipe("спец %_!", 10, true, MealType.BREAKFAST);
         em.flush();
         em.clear();
-        mvc.perform(get("/api/recipes/candidates").with(user("test"))
-                        .param("mealType", "BREAKFAST").param("maxPreparationTimeMin", "15")
-                        .param("q", "  " + tag.toLowerCase() + " спец %_!  "))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(
+                        get("/api/recipes/candidates")
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .param("mealType", "BREAKFAST")
+                                .param("maxPreparationTimeMin", "15")
+                                .param("q", "  " + tag.toLowerCase() + " спец %_!  "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
     void emptyResultIsSuccessfulAndGeneralCatalogueKeepsUnclassifiedRecipes() throws Exception {
-        mvc.perform(candidates("LUNCH", "0")).andExpect(status().isOk())
+        mvc.perform(candidates("LUNCH", "0"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty());
-        mvc.perform(get("/api/recipes").param("q", tag + " E").with(user("test")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+        mvc.perform(
+                        get("/api/recipes")
+                                .param("q", tag + " E")
+                                .with(user("test").roles("CATALOG_EDITOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].mealTypes").isEmpty());
     }
 
     @Test
     void classifiesExistingRecipeAndCanClearClassification() throws Exception {
-        mvc.perform(classify(unclassified.getId(), "{\"mealTypes\":[\"BREAKFAST\",\"SNACK\",\"BREAKFAST\"]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.mealTypes.length()").value(2));
+        mvc.perform(
+                        classify(
+                                unclassified.getId(),
+                                "{\"mealTypes\":[\"BREAKFAST\",\"SNACK\",\"BREAKFAST\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mealTypes.length()").value(2));
         em.flush();
         em.clear();
-        mvc.perform(candidates("BREAKFAST", "15")).andExpect(status().isOk())
+        mvc.perform(candidates("BREAKFAST", "15"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(3));
         mvc.perform(classify(unclassified.getId(), "{\"mealTypes\":[]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.mealTypes").isEmpty());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mealTypes").isEmpty());
         em.flush();
         em.clear();
-        mvc.perform(candidates("BREAKFAST", "15")).andExpect(status().isOk())
+        mvc.perform(candidates("BREAKFAST", "15"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2));
     }
 
     @Test
     void createsClassifiedRecipeAndKeepsLegacyCreationCompatible() throws Exception {
-        mvc.perform(post("/api/recipes").with(user("test")).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(",\"mealTypes\":[\"BREAKFAST\"]")))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.mealTypes[0]").value("BREAKFAST"));
-        mvc.perform(post("/api/recipes").with(user("test")).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody("")))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.mealTypes").isEmpty());
+        mvc.perform(
+                        post("/api/recipes")
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(createBody(",\"mealTypes\":[\"BREAKFAST\"]")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mealTypes[0]").value("BREAKFAST"));
+        mvc.perform(
+                        post("/api/recipes")
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(createBody("")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mealTypes").isEmpty());
     }
 
     @Test
     void detailsExposeMealTypesWithoutChangingNutrition() throws Exception {
-        mvc.perform(get("/api/recipes/{id}", quick.getId()).with(user("test")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.mealTypes[0]").value("BREAKFAST"))
+        mvc.perform(
+                        get("/api/recipes/{id}", quick.getId())
+                                .with(user("test").roles("CATALOG_EDITOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mealTypes[0]").value("BREAKFAST"))
                 .andExpect(jsonPath("$.nutritionTotal.calories").value(100));
     }
 
     @Test
     void validatesClassificationAndProtectsMutations() throws Exception {
-        for (String body : new String[]{"{}", "{\"mealTypes\":null}", "{\"mealTypes\":[null]}", "{\"mealTypes\":[\"SOUP\"]}"}) {
+        for (String body :
+                new String[] {
+                    "{}",
+                    "{\"mealTypes\":null}",
+                    "{\"mealTypes\":[null]}",
+                    "{\"mealTypes\":[\"SOUP\"]}"
+                }) {
             mvc.perform(classify(quick.getId(), body)).andExpect(status().isBadRequest());
         }
-        mvc.perform(classify(UUID.randomUUID(), "{\"mealTypes\":[]}")).andExpect(status().isNotFound());
-        mvc.perform(put("/api/recipes/{id}/meal-types", quick.getId()).with(user("test"))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"mealTypes\":[]}"))
+        mvc.perform(classify(UUID.randomUUID(), "{\"mealTypes\":[]}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(
+                        put("/api/recipes/{id}/meal-types", quick.getId())
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"mealTypes\":[]}"))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/api/recipes/candidates").param("mealType", "BREAKFAST")
-                        .param("maxPreparationTimeMin", "15"))
+        mvc.perform(
+                        get("/api/recipes/candidates")
+                                .param("mealType", "BREAKFAST")
+                                .param("maxPreparationTimeMin", "15"))
                 .andExpect(status().isUnauthorized());
     }
 
     @ParameterizedTest
-    @CsvSource({"mealType,SOUP", "maxPreparationTimeMin,-1", "maxPreparationTimeMin,abc", "page,-1", "size,0", "size,101"})
+    @CsvSource({
+        "mealType,SOUP",
+        "maxPreparationTimeMin,-1",
+        "maxPreparationTimeMin,abc",
+        "page,-1",
+        "size,0",
+        "size,101"
+    })
     void rejectsInvalidCandidateParameters(String key, String value) throws Exception {
-        MockHttpServletRequestBuilder request = get("/api/recipes/candidates").with(user("test")).param("q", tag);
+        MockHttpServletRequestBuilder request =
+                get("/api/recipes/candidates")
+                        .with(user("test").roles("CATALOG_EDITOR"))
+                        .param("q", tag);
         if (!key.equals("mealType")) request.param("mealType", "BREAKFAST");
         if (!key.equals("maxPreparationTimeMin")) request.param("maxPreparationTimeMin", "15");
         mvc.perform(request.param(key, value)).andExpect(status().isBadRequest());
@@ -169,9 +235,15 @@ class RecipeCandidatesIntegrationTest {
 
     @Test
     void requiresMealTypeAndTimeLimit() throws Exception {
-        mvc.perform(get("/api/recipes/candidates").with(user("test")).param("mealType", "BREAKFAST"))
+        mvc.perform(
+                        get("/api/recipes/candidates")
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .param("mealType", "BREAKFAST"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get("/api/recipes/candidates").with(user("test")).param("maxPreparationTimeMin", "15"))
+        mvc.perform(
+                        get("/api/recipes/candidates")
+                                .with(user("test").roles("CATALOG_EDITOR"))
+                                .param("maxPreparationTimeMin", "15"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -179,23 +251,35 @@ class RecipeCandidatesIntegrationTest {
         Recipe value = new Recipe(tag + " " + name, null, "Приготовить", minutes, 1);
         value.changeMealTypes(Set.of(types));
         em.persist(value);
-        if (withIngredients) em.persist(new RecipeIngredient(value, product, new BigDecimal("100"), 1));
+        if (withIngredients)
+            em.persist(new RecipeIngredient(value, product, new BigDecimal("100"), 1));
         return value;
     }
 
     private MockHttpServletRequestBuilder candidates(String type, String minutes) {
-        return get("/api/recipes/candidates").with(user("test")).param("q", tag)
-                .param("mealType", type).param("maxPreparationTimeMin", minutes);
+        return get("/api/recipes/candidates")
+                .with(user("test").roles("CATALOG_EDITOR"))
+                .param("q", tag)
+                .param("mealType", type)
+                .param("maxPreparationTimeMin", minutes);
     }
 
     private MockHttpServletRequestBuilder classify(UUID id, String body) {
-        return put("/api/recipes/{id}/meal-types", id).with(user("test")).with(csrf())
-                .contentType(MediaType.APPLICATION_JSON).content(body);
+        return put("/api/recipes/{id}/meal-types", id)
+                .with(user("test").roles("CATALOG_EDITOR"))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body);
     }
 
     private String createBody(String mealTypes) {
-        return "{\"name\":\"" + tag + " новый\",\"instructions\":\"Приготовить\","
+        return "{\"name\":\""
+                + tag
+                + " новый\",\"instructions\":\"Приготовить\","
                 + "\"preparationTimeMin\":10,\"servings\":1,\"ingredients\":[{\"productId\":"
-                + product.getId() + ",\"quantityG\":100}]" + mealTypes + "}";
+                + product.getId()
+                + ",\"quantityG\":100}]"
+                + mealTypes
+                + "}";
     }
 }

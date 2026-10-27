@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 async function fixture(page: Page) {
+  await page.clock.install({ time: new Date('2026-10-22T12:00:00+03:00') });
   const state = {
     revision: 0,
     lots: [] as any[],
@@ -175,7 +176,10 @@ test('cooking deduction can be reversed and skipped from the menu', async ({ pag
   const state = await fixture(page);
   await page.goto('/?date=2026-10-22');
   await page.getByRole('button', { name: 'Приготовил', exact: true }).click();
-  await expect(page.getByText('Ингредиенты списаны', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Готово к подаче · ингредиенты списаны', { exact: true }),
+  ).toBeVisible();
+  await page.getByText('Другие действия', { exact: true }).click();
   await page.getByRole('button', { name: 'Отменить ошибочное списание' }).click();
   await expect(page.getByRole('button', { name: 'Приготовил', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
@@ -222,6 +226,7 @@ test('demo stock page does not call private API', async ({ page }) => {
 test('cancel day releases its workflow and can reopen as a draft', async ({ page }) => {
   const state = await fixture(page);
   await page.goto('/?date=2026-10-22');
+  await page.getByText('Запасы и настройки дня', { exact: true }).click();
   await page.getByRole('button', { name: 'Отменить день', exact: true }).click();
   await page.getByRole('button', { name: 'Подтвердить отмену дня' }).click();
   await expect(page.getByRole('button', { name: 'Восстановить в черновик' })).toBeVisible();

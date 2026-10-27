@@ -129,7 +129,9 @@ test('регистрация без калорий и без автоматич�
   state.registerConflict = false;
   await page.getByLabel('Пароль', { exact: true }).fill('secret123');
   await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Аккаунт создан', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Перейдите ко входу', exact: true }),
+  ).toBeVisible();
   expect(state.calls.some((c) => c.path.endsWith('/login'))).toBe(false);
 });
 test('вход, пропуск опроса и каталог без анкеты; сессионная cookie', async ({ page }) => {

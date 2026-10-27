@@ -22,6 +22,9 @@ export function saveBlockReason(
   now = Date.now(),
 ): string | null {
   if (view.savedPlanIds.length) return null;
+  const cap = view.result.options.maxShoppingProducts;
+  if (cap != null && shoppingProductCount(view) > cap)
+    return `Нужно купить ${shoppingProductCount(view)} разных продуктов при пределе ${cap}. Пересоберите меню или измените предел покупок.`;
   const missing = missingMeals(view);
   if (missing.length)
     return `Меню не готово: не подобрано приёмов пищи — ${missing.length}. Сначала заполните все дни.`;
@@ -63,7 +66,10 @@ export function purchaseKey(item: BasketItem): string {
 }
 export function shoppingText(view: PeriodView): string {
   const basket = view.result.shopping;
-  const incomplete = missingMeals(view).length > 0 || view.result.status === 'NO_FEASIBLE_FOUND';
+  const incomplete =
+    !view.savedPlanIds.length ||
+    missingMeals(view).length > 0 ||
+    view.result.status === 'NO_FEASIBLE_FOUND';
   const lines = [
     `${incomplete ? 'Предварительный список' : 'Список покупок'}: ${labelDate(view.result.options.from)} — ${labelDate(view.result.options.to)}${(view.result.participants?.length || 0) > 1 ? ` · на ${view.result.participants!.length} чел.` : ''}`,
   ];
@@ -107,4 +113,9 @@ export function recentPeriod(userId: string): RecentPeriod | null {
   } catch {
     return null;
   }
+}
+
+export function shoppingProductCount(view: PeriodView): number {
+  return new Set(view.result.shopping.items.filter((i) => needToBuy(i) > 0).map((i) => i.productId))
+    .size;
 }

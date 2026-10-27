@@ -9,8 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 public final class RecipeSnapshotFingerprint {
-    private RecipeSnapshotFingerprint() {
-    }
+    private RecipeSnapshotFingerprint() {}
 
     public static String calculate(RecipeSnapshot snapshot) {
         StringBuilder canonical = new StringBuilder();
@@ -31,9 +30,20 @@ public final class RecipeSnapshotFingerprint {
         }
         nutrition(canonical, snapshot.nutritionTotal());
         nutrition(canonical, snapshot.nutritionPerServing());
+        if (!snapshot.components().isEmpty())
+            for (var component : snapshot.components()) {
+                append(canonical, component.id());
+                append(canonical, component.role());
+                append(canonical, calculate(component.recipe()));
+                append(canonical, component.profile());
+                append(canonical, component.amounts());
+                append(canonical, component.locked());
+            }
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of()
+                    .formatHex(
+                            MessageDigest.getInstance("SHA-256")
+                                    .digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }
@@ -44,6 +54,10 @@ public final class RecipeSnapshotFingerprint {
         append(target, nutrition.protein());
         append(target, nutrition.fat());
         append(target, nutrition.carbs());
+        if (nutrition.knownFiber().signum() != 0 || nutrition.fiberComplete()) {
+            append(target, nutrition.knownFiber());
+            append(target, nutrition.fiberComplete());
+        }
     }
 
     private static void append(StringBuilder target, Object value) {
@@ -51,7 +65,10 @@ public final class RecipeSnapshotFingerprint {
             target.append("-1:");
             return;
         }
-        String text = value instanceof BigDecimal decimal ? decimal.stripTrailingZeros().toPlainString() : value.toString();
+        String text =
+                value instanceof BigDecimal decimal
+                        ? decimal.stripTrailingZeros().toPlainString()
+                        : value.toString();
         target.append(text.length()).append(':').append(text);
     }
 }

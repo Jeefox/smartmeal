@@ -160,6 +160,12 @@ function LiveMenuPreview() {
   const result = fresh ? bundle?.result : undefined;
   return (
     <>
+      <Notice>
+        Для индивидуальных количеств и сочетаний с гарнирами доступен обновлённый подбор.
+        <Link className="button" to="/menu-generation">
+          Подбор с гарнирами и клетчаткой
+        </Link>
+      </Notice>
       <PageHeading
         eyebrow="ИДЕЯ ДЛЯ ВАШЕГО ДНЯ"
         title="Подобрать меню"

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>dev.jeefox</groupId>
 	<artifactId>smartmeal</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1.0-prototype.1</version>
 	<name>smartmeal</name>
 	<description>Personal meal and shopping planner</description>
 	<url/>
@@ -28,8 +28,20 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+        <!-- Security fixes pinned across each managed family; recheck when upgrading Boot. -->
+        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
+        <tomcat.version>11.0.27</tomcat.version>
+        <bouncycastle.version>1.85</bouncycastle.version>
 	</properties>
-	<dependencies>
+	<dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.bouncycastle</groupId><artifactId>bcprov-jdk18on</artifactId><version>${bouncycastle.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
 		<dependency>
 			<groupId>io.minio</groupId>
 			<artifactId>minio</artifactId>
@@ -120,6 +132,8 @@
                         <smartmeal.storage.secret-key>smartmeal-test-secret</smartmeal.storage.secret-key>
                         <smartmeal.storage.bucket>smartmeal-test-recipes</smartmeal.storage.bucket>
 						<smartmeal.prices.auto-refresh.enabled>false</smartmeal.prices.auto-refresh.enabled>
+                        <smartmeal.security.auth-requests-per-minute>1000</smartmeal.security.auth-requests-per-minute>
+                        <smartmeal.security.writes-per-minute>10000</smartmeal.security.writes-per-minute>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

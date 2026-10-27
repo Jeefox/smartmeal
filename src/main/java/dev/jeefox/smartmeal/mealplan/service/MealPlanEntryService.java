@@ -52,7 +52,7 @@ public class MealPlanEntryService {
         if (households != null && !households.people(planId).isEmpty())
             throw dev.jeefox.smartmeal.mealplan.generation.period.PlanningException.conflict(
                     "Добавление нового блюда в семейное меню выполняется через общий подбор с"
-                        + " проверкой ограничений всех участников");
+                            + " проверкой ограничений всех участников");
         Recipe recipe =
                 recipes.findById(request.recipeId())
                         .orElseThrow(() -> new RecipeNotFoundException(request.recipeId()));
@@ -109,6 +109,10 @@ public class MealPlanEntryService {
         MealPlanEntry entry =
                 entries.findByIdAndMealPlan_Id(entryId, planId)
                         .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
+        if (!entry.getRecipeSnapshot().components().isEmpty())
+            throw dev.jeefox.smartmeal.mealplan.generation.period.PlanningException.conflict(
+                    "COMPOSITE_PORTIONS_FIXED",
+                    "Индивидуальные количества составного приёма пищи меняются через новый подбор");
         entry.updatePortions(request.portions());
         plan.markModified();
         return response(entry);

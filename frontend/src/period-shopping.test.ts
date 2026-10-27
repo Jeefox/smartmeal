@@ -6,6 +6,7 @@ import {
   purchaseKey,
   saveBlockReason,
   shoppingText,
+  shoppingProductCount,
 } from './period-shopping';
 import type { BasketItem, PeriodView } from './period-planning';
 const item: BasketItem = {
@@ -181,4 +182,19 @@ describe('plain shopping list', () => {
     result.result.entries = [];
     expect(shoppingText(result)).toContain('Предварительный список');
   });
+});
+
+it('counts buying products once, excludes home stock and blocks exceeding the explicit cap', () => {
+  const v = view();
+  v.result.options.maxShoppingProducts = 1;
+  v.result.shopping.items = [
+    item,
+    { ...item, packageCount: 3 },
+    { ...item, productId: 2, needToBuyG: 0, fromPantryG: 450 },
+  ];
+  expect(shoppingProductCount(v)).toBe(1);
+  expect(saveBlockReason(v, 2000)).toBeNull();
+  v.result.shopping.items.push({ ...item, productId: 3, purchaseCost: null });
+  expect(shoppingProductCount(v)).toBe(2);
+  expect(saveBlockReason(v, 2000)).toMatch(/при пределе 1/);
 });

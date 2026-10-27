@@ -9,6 +9,7 @@ public record ShoppingListItemResponse(
         BigDecimal requiredG,
         BigDecimal fromPantryG) {
     public ShoppingListItemResponse {
+        productName = dev.jeefox.smartmeal.shopping.ShoppingProductNames.display(productName);
         quantityG = quantityG.setScale(30, java.math.RoundingMode.HALF_UP);
         requiredG = requiredG.setScale(30, java.math.RoundingMode.HALF_UP);
         fromPantryG = fromPantryG.setScale(30, java.math.RoundingMode.HALF_UP);

@@ -47,7 +47,77 @@ public final class PlanningModels {
             @PositiveOrZero @Digits(integer = 6, fraction = 2) BigDecimal minSplitSavingRub,
             Long seed,
             Boolean usePantry,
-            @Size(max = 9) List<@NotNull UUID> householdMemberIds) {
+            @Size(max = 9) List<@NotNull UUID> householdMemberIds,
+            Boolean balancedMeals,
+            @Min(1) @Max(50) Integer maxShoppingProducts) {
+        public Options(
+                LocalDate from,
+                LocalDate to,
+                BigDecimal budgetRub,
+                List<Long> allowedChainIds,
+                String city,
+                PurchaseMode purchaseMode,
+                Map<MealType, Integer> maxPreparationTimeByMeal,
+                Integer maxRecipeOccurrences,
+                Integer minRepeatGapDays,
+                Boolean allowEstimatedPrices,
+                BigDecimal minSplitSavingRub,
+                Long seed,
+                Boolean usePantry,
+                List<UUID> householdMemberIds,
+                Boolean balancedMeals) {
+            this(
+                    from,
+                    to,
+                    budgetRub,
+                    allowedChainIds,
+                    city,
+                    purchaseMode,
+                    maxPreparationTimeByMeal,
+                    maxRecipeOccurrences,
+                    minRepeatGapDays,
+                    allowEstimatedPrices,
+                    minSplitSavingRub,
+                    seed,
+                    usePantry,
+                    householdMemberIds,
+                    balancedMeals,
+                    null);
+        }
+
+        public Options(
+                LocalDate from,
+                LocalDate to,
+                BigDecimal budgetRub,
+                List<Long> allowedChainIds,
+                String city,
+                PurchaseMode purchaseMode,
+                Map<MealType, Integer> maxPreparationTimeByMeal,
+                Integer maxRecipeOccurrences,
+                Integer minRepeatGapDays,
+                Boolean allowEstimatedPrices,
+                BigDecimal minSplitSavingRub,
+                Long seed,
+                Boolean usePantry,
+                List<UUID> householdMemberIds) {
+            this(
+                    from,
+                    to,
+                    budgetRub,
+                    allowedChainIds,
+                    city,
+                    purchaseMode,
+                    maxPreparationTimeByMeal,
+                    maxRecipeOccurrences,
+                    minRepeatGapDays,
+                    allowEstimatedPrices,
+                    minSplitSavingRub,
+                    seed,
+                    usePantry,
+                    householdMemberIds,
+                    false);
+        }
+
         public Options(
                 LocalDate from,
                 LocalDate to,
@@ -109,6 +179,7 @@ public final class PlanningModels {
         }
 
         public Options {
+            balancedMeals = Boolean.TRUE.equals(balancedMeals);
             householdMemberIds =
                     householdMemberIds == null
                             ? List.of()
@@ -166,7 +237,9 @@ public final class PlanningModels {
                     minSplitSavingRub,
                     value,
                     usePantry,
-                    householdMemberIds);
+                    householdMemberIds,
+                    balancedMeals,
+                    maxShoppingProducts);
         }
     }
 
@@ -220,6 +293,10 @@ public final class PlanningModels {
             String applicability,
             BigDecimal fromPantryG,
             BigDecimal needToBuyG) {
+        public BasketItem {
+            productName = dev.jeefox.smartmeal.shopping.ShoppingProductNames.display(productName);
+        }
+
         public BasketItem(
                 Long productId,
                 String productName,
@@ -425,11 +502,47 @@ public final class PlanningModels {
     public record Replacement(
             @Min(0) long expectedRevision,
             @NotNull UUID recipeId,
-            @NotNull @Positive @Digits(integer = 2, fraction = 2) BigDecimal portions) {}
+            @NotNull @Positive @Digits(integer = 2, fraction = 2) BigDecimal portions,
+            @Size(max = 100) String candidateKey,
+            @Size(max = 120) String componentId,
+            @jakarta.validation.constraints.Pattern(regexp = "[0-9a-f]{64}") String comparisonKey) {
+        public Replacement(
+                long expectedRevision,
+                UUID recipeId,
+                BigDecimal portions,
+                String candidateKey,
+                String componentId) {
+            this(expectedRevision, recipeId, portions, candidateKey, componentId, null);
+        }
+
+        public Replacement(long expectedRevision, UUID recipeId, BigDecimal portions) {
+            this(expectedRevision, recipeId, portions, null, null, null);
+        }
+    }
 
     public record Lock(@Min(0) long expectedRevision, boolean locked) {}
 
     public record Commit(@Min(0) long expectedRevision, boolean acceptWarnings) {}
+
+    public enum ReplacementGoal {
+        SAME_PRODUCTS,
+        CHEAPER,
+        FASTER
+    }
+
+    public record ChangedProduct(Long productId, String name) {}
+
+    public record ReplacementImpact(
+            List<ChangedProduct> addedProducts,
+            List<ChangedProduct> removedProducts,
+            int purchaseProductsBefore,
+            int purchaseProductsAfter,
+            int minutesSaved,
+            boolean usePantry,
+            long pantryRevision,
+            BigDecimal previousPurchaseCost,
+            Instant dataAsOf,
+            List<dev.jeefox.smartmeal.household.HouseholdModels.PersonPortion> personPortions) {}
 
     public record Alternative(
             UUID recipeId,
@@ -440,5 +553,70 @@ public final class PlanningModels {
             BigDecimal newPurchaseCost,
             BigDecimal deltaPurchaseCost,
             BudgetStatus budgetStatus,
-            PriceQuality priceQuality) {}
+            PriceQuality priceQuality,
+            String candidateKey,
+            dev.jeefox.smartmeal.mealplan.snapshot.RecipeSnapshot proposedRecipe,
+            List<ReplacementGoal> goals,
+            ReplacementImpact impact,
+            String comparisonKey) {
+        public Alternative(
+                UUID recipeId,
+                String name,
+                BigDecimal portions,
+                int preparationTimeMin,
+                NutritionValues dayNutrition,
+                BigDecimal newPurchaseCost,
+                BigDecimal deltaPurchaseCost,
+                BudgetStatus budgetStatus,
+                PriceQuality priceQuality) {
+            this(
+                    recipeId,
+                    name,
+                    portions,
+                    preparationTimeMin,
+                    dayNutrition,
+                    newPurchaseCost,
+                    deltaPurchaseCost,
+                    budgetStatus,
+                    priceQuality,
+                    null,
+                    null,
+                    List.of(),
+                    null,
+                    null);
+        }
+
+        public Alternative(
+                UUID recipeId,
+                String name,
+                BigDecimal portions,
+                int preparationTimeMin,
+                NutritionValues dayNutrition,
+                BigDecimal newPurchaseCost,
+                BigDecimal deltaPurchaseCost,
+                BudgetStatus budgetStatus,
+                PriceQuality priceQuality,
+                String candidateKey,
+                dev.jeefox.smartmeal.mealplan.snapshot.RecipeSnapshot proposedRecipe) {
+            this(
+                    recipeId,
+                    name,
+                    portions,
+                    preparationTimeMin,
+                    dayNutrition,
+                    newPurchaseCost,
+                    deltaPurchaseCost,
+                    budgetStatus,
+                    priceQuality,
+                    candidateKey,
+                    proposedRecipe,
+                    List.of(),
+                    null,
+                    null);
+        }
+
+        public Alternative {
+            goals = goals == null ? List.of() : List.copyOf(goals);
+        }
+    }
 }

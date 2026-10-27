@@ -35,7 +35,9 @@ async function fixture(page: Page) {
       url = new URL(req.url()),
       path = url.pathname;
     if (path === '/api/me/profile')
-      return route.fulfill({ json: { userId: 'quick-price-user', dailyCalorieTarget: 2000 } });
+      return route.fulfill({
+        json: { canEditCatalogue: true, userId: 'quick-price-user', dailyCalorieTarget: 2000 },
+      });
     if (path === '/api/auth/csrf')
       return route.fulfill({
         json: { token: 'fresh-token', headerName: 'X-CSRF', parameterName: '_csrf' },

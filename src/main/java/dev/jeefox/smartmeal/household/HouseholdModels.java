@@ -26,11 +26,34 @@ public final class HouseholdModels {
             List<Long> excludedProductIds,
             List<ProductChoice> excludedProducts) {}
 
-    public record Participant(UUID id, String name, int dailyCalorieTarget, boolean accountOwner) {}
+    public record Participant(
+            UUID id,
+            String name,
+            int dailyCalorieTarget,
+            boolean accountOwner,
+            BigDecimal proteinTargetG,
+            BigDecimal fiberTargetG) {
+        public Participant(UUID id, String name, int dailyCalorieTarget, boolean accountOwner) {
+            this(id, name, dailyCalorieTarget, accountOwner, null, null);
+        }
+    }
 
     public record PersonPortion(
             UUID participantId, String name, BigDecimal portions, NutritionValues nutrition) {}
 
     public record PersonNutrition(
-            UUID participantId, String name, int dailyCalorieTarget, NutritionValues nutrition) {}
+            UUID participantId,
+            String name,
+            int dailyCalorieTarget,
+            NutritionValues nutrition,
+            BigDecimal proteinTargetG,
+            BigDecimal fiberTargetG) {
+        public PersonNutrition(
+                UUID participantId,
+                String name,
+                int dailyCalorieTarget,
+                NutritionValues nutrition) {
+            this(participantId, name, dailyCalorieTarget, nutrition, null, null);
+        }
+    }
 }

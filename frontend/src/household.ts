@@ -25,6 +25,8 @@ export type PersonNutrition = {
   participantId: string;
   name: string;
   dailyCalorieTarget: number;
+  proteinTargetG?: number | null;
+  fiberTargetG?: number | null;
   nutrition: Nutrition;
 };
 export const householdApi = {
@@ -35,5 +37,7 @@ export const householdApi = {
       body: JSON.stringify(input),
     }),
   remove: (id: string) =>
-    request<void>(`/me/household-members/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    request<void>(`/me/household-members/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
 };

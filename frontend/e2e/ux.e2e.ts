@@ -70,7 +70,7 @@ test('город сохраняется после перезагрузки, п�
   page,
 }) => {
   const calls = await fixture(page);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await page.getByLabel('Город', { exact: true }).fill('Тула');
   await page.getByRole('button', { name: 'Найти магазины', exact: true }).click();
   await expect(page.locator('.location-summary')).toContainText('Тула');
@@ -95,7 +95,7 @@ test('выбранный магазин остаётся при переходе
   page,
 }) => {
   await fixture(page);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await page.getByLabel('Город', { exact: true }).fill('Тула');
   await page.getByRole('button', { name: 'Найти магазины', exact: true }).click();
   await page.getByRole('button', { name: /Сеть API.*Улица теста/ }).click();
@@ -106,6 +106,7 @@ test('выбранный магазин остаётся при переходе
     .getByRole('link', { name: /^Покупки/ })
     .first()
     .click();
+  await page.getByRole('link', { name: 'Рассчитать продукты по датам' }).click();
   await expect(page.locator('.estimate-result')).toBeVisible();
   await expect(page.locator('.store-choice.selected')).toContainText('Улица теста');
   await page.getByRole('button', { name: 'Сравнить магазины', exact: true }).click();

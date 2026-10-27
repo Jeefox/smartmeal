@@ -26,21 +26,40 @@ public class PurchaseBasketCalculator {
             List<Offer> offers,
             Options options,
             dev.jeefox.smartmeal.pantry.PantryModels.Snapshot stock) {
-        Map<Long, BigDecimal> quantities = new TreeMap<>();
         var demands =
                 new ArrayList<dev.jeefox.smartmeal.pantry.IngredientDemandCalculator.Demand>();
         for (var e : entries)
             demands.addAll(
                     dev.jeefox.smartmeal.pantry.IngredientDemandCalculator.calculate(
                             e.id(), e.date(), e.mealType().ordinal(), e.recipe(), e.portions()));
-        for (var d : demands) quantities.merge(d.productId(), d.quantityG(), BigDecimal::add);
+        return calculateDemands(entries, offers, options, stock, demands);
+    }
+
+    public Basket calculateDemands(
+            List<Selection> entries,
+            List<Offer> offers,
+            Options options,
+            dev.jeefox.smartmeal.pantry.PantryModels.Snapshot stock,
+            List<dev.jeefox.smartmeal.pantry.IngredientDemandCalculator.Demand> demands) {
         var coverage =
                 options.usePantry()
                         ? dev.jeefox.smartmeal.pantry.PantryAllocationCalculator.allocate(
                                         demands, stock)
                                 .coveredG()
                         : Map.<Long, BigDecimal>of();
+        return calculateCovered(entries, offers, options, demands, coverage);
+    }
+
+    public Basket calculateCovered(
+            List<Selection> entries,
+            List<Offer> offers,
+            Options options,
+            List<dev.jeefox.smartmeal.pantry.IngredientDemandCalculator.Demand> demands,
+            Map<Long, BigDecimal> coverage) {
+        Map<Long, BigDecimal> quantities = new TreeMap<>();
+        for (var d : demands) quantities.merge(d.productId(), d.quantityG(), BigDecimal::add);
         Map<Long, String> names = new HashMap<>();
+        demands.forEach(d -> names.putIfAbsent(d.productId(), d.name()));
         Map<Long, Selection> namingEntries = new HashMap<>();
         for (Selection entry : entries) {
             for (var ingredient : entry.recipe().ingredients()) {

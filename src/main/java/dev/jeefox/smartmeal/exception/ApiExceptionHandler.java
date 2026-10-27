@@ -14,6 +14,15 @@ import java.util.List;
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(dev.jeefox.smartmeal.shopping.purchase.ShoppingPurchaseException.class)
+    public ProblemDetail handleShoppingPurchase(
+            dev.jeefox.smartmeal.shopping.purchase.ShoppingPurchaseException ex) {
+        var detail = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
+        detail.setTitle("Не удалось изменить список покупок");
+        detail.setProperty("code", ex.code());
+        return detail;
+    }
+
     @ExceptionHandler(dev.jeefox.smartmeal.household.HouseholdException.class)
     public ProblemDetail handleHousehold(dev.jeefox.smartmeal.household.HouseholdException ex) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
@@ -51,7 +60,12 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleArgumentNotValid(MethodArgumentNotValidException exception) {
-        log.debug("{}", exception.getMessage());
+        log.debug(
+                "Ошибка валидации: {}",
+                exception.getBindingResult().getFieldErrors().stream()
+                        .map(error -> error.getField())
+                        .distinct()
+                        .toList());
         ProblemDetail detail =
                 ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Проверьте поля запроса");
         detail.setTitle("Ошибка валидации");

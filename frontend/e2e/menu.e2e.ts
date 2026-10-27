@@ -242,7 +242,7 @@ test('карточка рецепта создаёт день только по�
     state.calls.filter((c) => c.path === '/api/me/meal-plans' && c.method === 'POST'),
   ).toHaveLength(1);
   expect(state.plans['2026-10-18'].entries).toHaveLength(1);
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await expect(page.locator('main')).toContainText('На этот период нет продуктов');
   expect(state.calls.some((c) => c.path === '/api/me/shopping-list')).toBe(true);
 });
@@ -257,7 +257,7 @@ test('мобильное меню 360/390/768/1440 без переполнени
     );
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('heading', { name: 'Хороший день начинается с плана' }).click();
+  await page.getByRole('heading', { name: 'Меню на день' }).click();
   await page.locator('.toast').waitFor({ state: 'hidden' });
   await page.screenshot({ path: 'test-results/live-menu-mobile.png', fullPage: true });
 });

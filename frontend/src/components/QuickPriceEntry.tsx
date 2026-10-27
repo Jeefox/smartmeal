@@ -16,6 +16,10 @@ import type { PriceBatch, PriceDraft, PriceEntryItem } from '../price-entry';
 import { ErrorState, Loading, Notice } from './ui';
 
 export default function QuickPriceEntry({ storeId }: { storeId: number }) {
+  const { profile } = useSession();
+  return profile?.canEditCatalogue ? <Editor storeId={storeId} /> : null;
+}
+function Editor({ storeId }: { storeId: number }) {
   const user = useSession().profile!.userId,
     online = useOnline(),
     client = useQueryClient();

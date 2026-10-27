@@ -1,12 +1,17 @@
 import type { Nutrition, Offer, PlanEntry, ShoppingItem } from './types';
-export const zeroNutrition = (): Nutrition => ({ calories: 0, protein: 0, fat: 0, carbs: 0 });
+export const zeroNutrition = (): Nutrition => ({
+  calories: 0,
+  protein: 0,
+  fat: 0,
+  carbs: 0,
+});
 export function planNutrition(entries: PlanEntry[]): Nutrition | null {
   if (entries.some((entry) => !entry.recipe.nutritionTotal && !entry.recipe.nutritionPerServing))
     return null;
   return entries.reduce((total, entry) => {
     const base = entry.recipe.nutritionTotal;
     const serving = entry.recipe.nutritionPerServing!;
-    for (const key of Object.keys(total) as (keyof Nutrition)[])
+    for (const key of ['calories', 'protein', 'fat', 'carbs'] as const)
       total[key] += (base ? base[key] / entry.recipe.servings : serving[key]) * entry.portions;
     return total;
   }, zeroNutrition());
@@ -122,6 +127,7 @@ export const labelDate = (
   key: string,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' },
 ) =>
-  new Intl.DateTimeFormat('ru-RU', { ...options, timeZone: 'Europe/Moscow' }).format(
-    new Date(`${key}T12:00:00+03:00`),
-  );
+  new Intl.DateTimeFormat('ru-RU', {
+    ...options,
+    timeZone: 'Europe/Moscow',
+  }).format(new Date(`${key}T12:00:00+03:00`));

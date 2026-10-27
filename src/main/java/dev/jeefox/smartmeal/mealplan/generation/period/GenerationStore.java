@@ -15,8 +15,13 @@ import java.util.UUID;
 public class GenerationStore {
     private final MenuGenerationRepository generations;
     private final UserRepository users;
+    private final dev.jeefox.smartmeal.pantry.PantryService pantry;
 
-    public GenerationStore(MenuGenerationRepository generations, UserRepository users) {
+    public GenerationStore(
+            MenuGenerationRepository generations,
+            UserRepository users,
+            dev.jeefox.smartmeal.pantry.PantryService pantry) {
+        this.pantry = pantry;
         this.generations = generations;
         this.users = users;
     }
@@ -47,6 +52,18 @@ public class GenerationStore {
         return generation.view();
     }
 
+    @Transactional
+    public View replaceQuoted(
+            String email, UUID id, long revision, Document document, long pantryRevision) {
+        pantry.lockOwner(email);
+        if (document.options().usePantry()
+                && pantry.snapshot(email, java.util.Set.of()).revision() != pantryRevision)
+            throw PlanningException.conflict(
+                    "REPLACEMENT_COMPARISON_CHANGED",
+                    "Запасы изменились. Обновите варианты замены.");
+        return replace(email, id, revision, document);
+    }
+
     MenuGeneration owned(String email, UUID id, boolean lock) {
         return (lock
                         ? generations.findOwnedForUpdate(id, email)
@@ -62,6 +79,7 @@ public class GenerationStore {
     static void checkEditable(MenuGeneration generation, long revision) {
         if (generation.getCommitKey() != null)
             throw PlanningException.conflict(
+                    "GENERATION_ALREADY_SAVED",
                     "Меню уже сохранено. Создайте новый подбор для другого периода.");
         if (generation.getExpiresAt().isBefore(Instant.now()))
             throw new PlanningException(
@@ -70,6 +88,7 @@ public class GenerationStore {
                     "Срок предпросмотра истёк. Подберите меню ещё раз.");
         if (generation.getRevision() != revision)
             throw PlanningException.conflict(
+                    "GENERATION_REVISION_CONFLICT",
                     "Предпросмотр изменился в другом запросе. Обновите страницу.");
     }
 }

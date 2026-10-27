@@ -24,11 +24,15 @@ import RecipeEditor from './pages/RecipeEditor';
 import Planner from './pages/Planner';
 import { ProfilePage, StoresPage, AuthPage, Onboarding } from './pages/Settings';
 import { Empty, Loading } from './components/ui';
-import { RequireSession, useSession } from './session';
+import { RequireSession, RequireCatalogueEditor, RequireKitchenSetup, useSession } from './session';
 import { Welcome } from './pages/Account';
+const KitchenPage = lazy(() => import('./pages/Kitchen'));
 const PlanningPreferencesPage = lazy(() => import('./pages/PlanningPreferences'));
 const HouseholdPage = lazy(() => import('./pages/Household'));
+const CookingPage = lazy(() => import('./pages/Cooking'));
 const PantryPage = lazy(() => import('./pages/Pantry'));
+import NutritionTargetsPage from './pages/NutritionTargets';
+const ShoppingSessionsPage = lazy(() => import('./pages/ShoppingSessions'));
 const PeriodMenuPage = lazy(() => import('./pages/PeriodMenu'));
 const PlanningMetadataPage = lazy(() => import('./pages/PlanningMetadata'));
 const MenuPreviewPage = lazy(() => import('./pages/MenuPreview'));
@@ -44,6 +48,7 @@ const secondaryNavigation = [
   { to: '/products', label: 'Продукты', icon: Package },
   { to: '/household', label: 'Семья и порции', icon: Users },
   { to: '/pantry', label: 'Домашние запасы', icon: Package },
+  { to: '/cooking', label: 'Готовка и остатки', icon: ChefHat },
   { to: '/profile', label: 'Мой профиль', icon: CircleUserRound },
 ];
 export default function App() {
@@ -57,18 +62,23 @@ export default function App() {
     setMenu(false);
     document.querySelector('main')?.scrollTo(0, 0);
   }, [location.pathname]);
-  const title =
-    [...mainNavigation, ...secondaryNavigation].find((item) => item.to === location.pathname)
-      ?.label ||
-    {
-      '/menu-preview': 'Подбор меню',
-      '/menu-generation': 'Подбор на неделю',
-      '/login': 'Вход',
-      '/register': 'Регистрация',
-      '/onboarding': 'Опрос',
-      '/welcome': 'Добро пожаловать',
-    }[location.pathname] ||
-    'Рецепты';
+  const title = location.pathname.startsWith('/shopping-lists')
+    ? 'Покупки'
+    : [...mainNavigation, ...secondaryNavigation].find((item) => item.to === location.pathname)
+        ?.label ||
+      {
+        '/cooking': 'Готовка и остатки',
+        '/nutrition-settings': 'Белок и клетчатка',
+        '/menu-preview': 'Подбор меню',
+        '/menu-generation': 'Подбор на неделю',
+        '/login': 'Вход',
+        '/register': 'Регистрация',
+        '/onboarding': 'Опрос',
+        '/welcome': 'Добро пожаловать',
+        '/setup/kitchen': 'Моя кухня',
+        '/profile/kitchen': 'Моя кухня',
+      }[location.pathname] ||
+      'Рецепты';
   function changeMode(next: 'api' | 'demo') {
     query.cancelQueries();
     query.clear();
@@ -111,7 +121,7 @@ export default function App() {
             <NavLink
               end={item.to === '/'}
               key={item.to}
-              to={item.to}
+              to={item.to === '/shopping' && mode === 'api' ? '/shopping-lists' : item.to}
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             >
               <item.icon size={19} />
@@ -125,7 +135,7 @@ export default function App() {
           {secondaryNavigation.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to === '/shopping' && mode === 'api' ? '/shopping-lists' : item.to}
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             >
               <item.icon size={18} />
@@ -172,11 +182,7 @@ export default function App() {
                   : 'Войти в аккаунт'}
             </b>
             <small>
-              {mode === 'demo'
-                ? 'Только в этом браузере'
-                : session.profile
-                  ? 'Данные на сервере'
-                  : 'Серверная сессия'}
+              {mode === 'demo' ? 'Только в этом браузере' : session.profile ? 'Настройки' : 'Вход'}
             </small>
           </span>
           <ChevronRight size={15} />
@@ -199,24 +205,18 @@ export default function App() {
           <div className="topbar-right">
             <span className={`mode-badge ${mode === 'demo' ? 'demo' : 'live'}`}>
               <span />
-              {mode === 'demo' ? 'Деморежим' : 'Данные API'}
+              {mode === 'demo' ? 'Деморежим' : 'Мой план'}
             </span>
             <Link className="icon-button" aria-label="Профиль" to="/profile">
               <CircleUserRound size={22} />
             </Link>
           </div>
         </header>
-        <div className={`mode-banner ${mode === 'demo' ? '' : 'api-banner'}`} role="status">
-          {mode === 'demo' ? (
-            <>
-              <span>ДЕМО</span>Учебные меню и цены. Изменения сохраняются только в этом браузере.
-            </>
-          ) : (
-            <>
-              <span>API</span>Ваш аккаунт, меню и покупки связаны с сервером.
-            </>
-          )}
-        </div>
+        {mode === 'demo' && (
+          <div className="mode-banner" role="status">
+            <span>ДЕМО</span>Пример меню и цен. Для своего меню войдите в аккаунт.
+          </div>
+        )}
         {!online && (
           <div className="offline-banner" role="alert">
             <WifiOff size={17} />
@@ -244,7 +244,30 @@ export default function App() {
                   </Suspense>
                 }
               />
-              <Route path="/welcome" element={<Welcome />} />
+              <Route
+                path="/setup/kitchen"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <KitchenPage initial />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/profile/kitchen"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <KitchenPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/welcome"
+                element={
+                  <RequireKitchenSetup>
+                    <Welcome />
+                  </RequireKitchenSetup>
+                }
+              />
               <Route path="/" element={<Planner />} />
               <Route path="/week" element={<Planner week />} />
               <Route
@@ -264,10 +287,20 @@ export default function App() {
                 }
               />
               <Route
+                path="/nutrition-settings"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <NutritionTargetsPage />
+                  </Suspense>
+                }
+              />
+              <Route
                 path="/menu-generation"
                 element={
                   <Suspense fallback={<Loading />}>
-                    <PeriodMenuPage />
+                    <RequireKitchenSetup>
+                      <PeriodMenuPage />
+                    </RequireKitchenSetup>
                   </Suspense>
                 }
               />
@@ -275,7 +308,9 @@ export default function App() {
                 path="/recipes/:id/planning"
                 element={
                   <Suspense fallback={<Loading />}>
-                    <PlanningMetadataPage />
+                    <RequireCatalogueEditor>
+                      <PlanningMetadataPage />
+                    </RequireCatalogueEditor>
                   </Suspense>
                 }
               />
@@ -283,20 +318,52 @@ export default function App() {
                 path="/products/:id/planning"
                 element={
                   <Suspense fallback={<Loading />}>
-                    <PlanningMetadataPage product />
+                    <RequireCatalogueEditor>
+                      <PlanningMetadataPage product />
+                    </RequireCatalogueEditor>
                   </Suspense>
                 }
               />
               <Route path="/recipes" element={<Catalog />} />
-              <Route path="/recipes/new" element={<RecipeEditor />} />
-              <Route path="/recipes/:id/edit" element={<RecipeEditor />} />
+              <Route
+                path="/recipes/new"
+                element={
+                  <RequireCatalogueEditor>
+                    <RecipeEditor />
+                  </RequireCatalogueEditor>
+                }
+              />
+              <Route
+                path="/recipes/:id/edit"
+                element={
+                  <RequireCatalogueEditor>
+                    <RecipeEditor />
+                  </RequireCatalogueEditor>
+                }
+              />
               <Route path="/recipes/:id" element={<RecipeDetail />} />
               <Route path="/products" element={<Products />} />
+              <Route
+                path="/cooking"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <CookingPage />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/pantry"
                 element={
                   <Suspense fallback={<Loading />}>
                     <PantryPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/shopping-lists/:id?"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <ShoppingSessionsPage />
                   </Suspense>
                 }
               />
@@ -310,7 +377,14 @@ export default function App() {
               />
               <Route path="/stores" element={<StoresPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/onboarding" element={<Onboarding />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <RequireKitchenSetup>
+                    <Onboarding />
+                  </RequireKitchenSetup>
+                }
+              />
               <Route
                 path="*"
                 element={
@@ -345,7 +419,11 @@ export default function App() {
           { to: '/shopping', label: 'Покупки', icon: ListChecks },
           { to: '/profile', label: 'Профиль', icon: CircleUserRound },
         ].map((item) => (
-          <NavLink end={item.to === '/'} key={item.to} to={item.to}>
+          <NavLink
+            end={item.to === '/'}
+            key={item.to}
+            to={item.to === '/shopping' && mode === 'api' ? '/shopping-lists' : item.to}
+          >
             <item.icon size={21} />
             <span>{item.label}</span>
           </NavLink>

@@ -1,1048 +1,879 @@
+import { shoppingProductCount } from '../period-shopping';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router';
-import { LockKeyhole, UnlockKeyhole, RefreshCw, ShoppingBasket, Sparkles } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { RefreshCw, SlidersHorizontal, ShoppingBasket } from 'lucide-react';
+import { ApiError, request } from '../api';
+import { labelDate } from '../domain';
 import { householdApi } from '../household';
-import { request } from '../api';
-import { dateKey, labelDate, number, shiftDate } from '../domain';
-import PeriodShoppingList from '../components/PeriodShoppingList';
-import { missingMeals, saveBlockReason, rememberPeriod } from '../period-shopping';
-import { mealLabels, mealPlanKey } from '../mealplans';
-import {
-  BackendPending,
-  Dialog,
-  Loading,
-  Notice,
-  NutritionValues,
-  PageHeading,
-} from '../components/ui';
+import { BackendPending, Dialog, Loading, Notice, PageHeading } from '../components/ui';
 import { useApp, useOnline } from '../state';
 import { useSession } from '../session';
+import { periodApi, validatePlanningOptions } from '../period-planning';
+import type { PeriodView, Alternative, PlanningOptions } from '../period-planning';
+import { mealPlanKey } from '../mealplans';
 import { invalidateShopping } from '../shopping';
-import { readCity } from '../store-preferences';
-import { budgetLabel, periodApi, validatePlanningOptions } from '../period-planning';
-import type {
-  Alternative,
-  PeriodView,
-  PlanningMeal,
-  PlanningOptions,
-  Selection,
-} from '../period-planning';
-
-const meals: PlanningMeal[] = ['BREAKFAST', 'LUNCH', 'DINNER'];
-const money = (value: number | null) =>
-  value == null ? 'Цена неизвестна' : `${number(value, 2)} ₽`;
+import { missingMeals } from '../period-shopping';
+import {
+  readPlanningPreferences,
+  savePlanningPreferences,
+  fromOptions,
+  draftOptions,
+  sameOptions,
+  commitKey,
+  clearCommitKey,
+  pendingCommit,
+  rememberSavedPeriod,
+} from '../planning-preferences';
+import type { PlanningDraft } from '../planning-preferences';
+import {
+  basketSummary,
+  budgetSummary,
+  incompleteSummary,
+  planningBlock,
+  errorRecovery,
+} from '../planning-presentation';
+import PlanningSetupForm from '../components/planning/PlanningSetupForm';
+import PeriodMenuOverview from '../components/planning/PeriodMenuOverview';
+import MealChoiceDialog from '../components/planning/MealChoiceDialog';
+import PlanningWarningsDialog from '../components/planning/PlanningWarningsDialog';
+import PlanningActionBar from '../components/planning/PlanningActionBar';
+import PeriodShoppingList from '../components/PeriodShoppingList';
+type Tab = 'options' | 'menu' | 'shopping';
 export default function PeriodMenu() {
   const { mode } = useApp();
   const { profile } = useSession();
   return mode === 'demo' ? (
     <BackendPending
       title="Недельный подбор работает через API"
-      description="Включите SmartMeal API и войдите в аккаунт: расчёт использует ваши ограничения и сохранённые цены."
+      description="Включите SmartMeal API и войдите в аккаунт: подбор учитывает ваши ограничения и сохранённые цены."
     />
   ) : (
     <LivePeriodMenu key={profile?.userId || 'anonymous'} />
   );
 }
 function LivePeriodMenu() {
-  const { profile } = useSession();
-  const { selectedDate, setSelectedDate, notify } = useApp();
+  const { profile } = useSession(),
+    userId = profile!.userId;
+  const { setSelectedDate, notify } = useApp();
   const online = useOnline(),
-    client = useQueryClient();
-  const [params, setParams] = useSearchParams();
-  const [from, setFrom] = useState(params.get('from') || selectedDate || dateKey(new Date()));
-  const [length, setLength] = useState(7);
-  const [budget, setBudget] = useState('');
-  const [city, setCity] = useState(readCity() || 'Тула');
-  const [selectedChains, setSelectedChains] = useState<number[]>([]);
-  const [split, setSplit] = useState(false),
-    [estimated, setEstimated] = useState(true);
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const household = useQuery({
-    queryKey: ['household', profile?.userId],
-    queryFn: ({ signal }) => householdApi.list(signal),
-    enabled: !!profile?.userId,
-  });
-  const [usePantry, setUsePantry] = useState(true);
-  const [repeat, setRepeat] = useState(2),
-    [gap, setGap] = useState(2),
-    [saving, setSaving] = useState(50);
-  const [times, setTimes] = useState<Record<PlanningMeal, number>>({
-    BREAKFAST: 15,
-    LUNCH: 45,
-    DINNER: 45,
-  });
+    client = useQueryClient(),
+    navigate = useNavigate();
+  const [params, setParams] = useSearchParams(),
+    requestedId = params.get('id');
+  const [draft, setDraft] = useState<PlanningDraft>(() => ({
+    ...readPlanningPreferences(userId),
+    ...(params.get('from') ? { from: params.get('from')! } : {}),
+  }));
   const [view, setView] = useState<PeriodView | null>(null),
-    [day, setDay] = useState(0);
-  const [tab, setTabValue] = useState<'options' | 'menu' | 'shopping'>(
-    params.get('tab') === 'shopping' ? 'shopping' : 'options',
+    viewRef = useRef<PeriodView | null>(null);
+  const [tab, setTab] = useState<Tab>(
+    requestedId
+      ? params.get('tab') === 'shopping'
+        ? 'shopping'
+        : params.get('tab') === 'options'
+          ? 'options'
+          : 'menu'
+      : 'options',
   );
-  const [advanced, setAdvanced] = useState(false);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30000);
-    return () => window.clearInterval(timer);
-  }, []);
-  function setTab(next: 'options' | 'menu' | 'shopping') {
-    setTabValue(next);
-    if (view) setParams({ id: view.id, tab: next }, { replace: true });
-  }
-  useEffect(() => {
-    if (view && profile?.userId) rememberPeriod(profile.userId, view);
-  }, [view, profile?.userId]);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  const [alternativeFor, setAlternativeFor] = useState<Selection | null>(null),
-    [alternatives, setAlternatives] = useState<Alternative[]>([]);
-  const [acceptWarnings, setAcceptWarnings] = useState(false);
-  const alive = useRef(true),
-    locked = useRef(false),
-    requestNumber = useRef(0),
-    abort = useRef<AbortController | null>(null);
-  const commitKeys = useRef(new Map<string, string>());
+  const [phase, setPhase] = useState<string | null>(null),
+    [error, setError] = useState<Error | null>(null),
+    [invalid, setInvalid] = useState<string | null>(null),
+    [advanced, setAdvanced] = useState(false),
+    [now, setNow] = useState(Date.now());
+  const [mealId, setMealId] = useState<string | null>(null),
+    [alternatives, setAlternatives] = useState<Alternative[] | null>(null),
+    [warningFor, setWarningFor] = useState<string | null>(null),
+    [relax, setRelax] = useState(false),
+    [commitState, setCommitState] = useState<'idle' | 'uncertain' | 'checked'>(() =>
+      requestedId && pendingCommit(userId, requestedId) ? 'uncertain' : 'idle',
+    );
+  const lifecycle = useRef({
+      alive: true,
+      serial: 0,
+      busy: false,
+      abort: null as AbortController | null,
+    }),
+    keys = useRef(new Map<string, string>()),
+    chooseDefault = useRef(!requestedId && !draft.chains.length);
+  const household = useQuery({
+    queryKey: ['household', userId],
+    queryFn: ({ signal }) => householdApi.list(signal),
+  });
   const chains = useQuery({
     queryKey: ['retail-chains'],
     queryFn: ({ signal }) => request<{ id: number; name: string }[]>('/retail-chains', { signal }),
   });
+  const busy = phase !== null;
   useEffect(() => {
-    if (chains.data?.length)
-      setSelectedChains((current) => (current.length ? current : [chains.data![0].id]));
-  }, [chains.data]);
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
-    alive.current = true;
+    lifecycle.current.alive = true;
     return () => {
-      alive.current = false;
-      abort.current?.abort();
-      requestNumber.current++;
+      lifecycle.current.alive = false;
+      lifecycle.current.abort?.abort();
+      lifecycle.current.serial++;
     };
   }, []);
-  const requestedId = params.get('id');
   useEffect(() => {
-    if (!requestedId || view?.id === requestedId) return;
-    const controller = new AbortController(),
-      serial = ++requestNumber.current;
-    setBusy(true);
-    locked.current = true;
-    periodApi
-      .get(requestedId, controller.signal)
-      .then((next) => {
-        if (!alive.current || serial !== requestNumber.current) return;
-        setView(next);
-        setDay(0);
-        setTabValue(params.get('tab') === 'shopping' ? 'shopping' : 'menu');
-        const options = next.result.options;
-        setFrom(options.from);
-        setLength(next.result.days.length);
-        setBudget(options.budgetRub == null ? '' : String(options.budgetRub));
-        setCity(options.city);
-        setSelectedChains(options.allowedChainIds);
-        setSplit(options.purchaseMode === 'TWO_CHAINS');
-        setTimes(options.maxPreparationTimeByMeal);
-        setRepeat(options.maxRecipeOccurrences);
-        setGap(options.minRepeatGapDays);
-        setEstimated(options.allowEstimatedPrices);
-        setUsePantry(options.usePantry !== false);
-        setSelectedMembers(options.householdMemberIds || []);
-        setSaving(options.minSplitSavingRub);
-      })
-      .catch((e) => {
-        if (alive.current && serial === requestNumber.current && e.name !== 'AbortError')
-          setError(e.message);
-      })
-      .finally(() => {
-        if (alive.current && serial === requestNumber.current) {
-          setBusy(false);
-          locked.current = false;
-        }
-      });
-    return () => controller.abort();
-  }, [requestedId, view?.id]);
-  async function run<T>(task: (signal: AbortSignal) => Promise<T>, done: (value: T) => void) {
-    if (locked.current || !online) return;
-    locked.current = true;
-    setBusy(true);
-    setError('');
-    const controller = new AbortController(),
-      serial = ++requestNumber.current;
-    abort.current = controller;
+    if (chooseDefault.current && chains.data?.length) {
+      chooseDefault.current = false;
+      setDraft((d) => ({ ...d, chains: [chains.data![0].id] }));
+    }
+  }, [chains.data]);
+  function switchTab(next: Tab) {
+    setTab(next);
+    setInvalid(null);
+    if (viewRef.current) setParams({ id: viewRef.current.id, tab: next }, { replace: true });
+  }
+  function receive(next: PeriodView, nextTab: Tab = tab) {
+    viewRef.current = next;
+    setView(next);
+    setDraft(fromOptions(next.result.options));
+    setWarningFor(null);
+    setAlternatives(null);
+    setError(null);
+    setInvalid(null);
+    setTab(nextTab);
+    setParams({ id: next.id, tab: nextTab }, { replace: true });
+    if (next.savedPlanIds.length) {
+      rememberSavedPeriod(userId, next);
+      clearCommitKey(userId, next.id);
+      setCommitState('idle');
+    }
+  }
+  function afterSaved(next: PeriodView) {
+    receive(next, 'shopping');
+    setMealId(null);
+    setSelectedDate(next.result.options.from);
+    notify(`Меню сохранено на ${next.savedPlanIds.length} дней`);
+    for (const day of next.result.days)
+      client.invalidateQueries({ queryKey: mealPlanKey(userId, day.date) });
+    invalidateShopping(client, userId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  async function run<T>(
+    name: string,
+    task: (signal: AbortSignal) => Promise<T>,
+    done: (value: T) => void,
+  ) {
+    const state = lifecycle.current;
+    if (state.busy || !online) return;
+    state.busy = true;
+    const serial = ++state.serial,
+      controller = new AbortController();
+    state.abort = controller;
+    setPhase(name);
+    setError(null);
+    setInvalid(null);
     try {
       const result = await task(controller.signal);
-      if (alive.current && serial === requestNumber.current) done(result);
+      if (state.alive && serial === state.serial) done(result);
     } catch (e) {
       if (
-        alive.current &&
-        serial === requestNumber.current &&
-        e instanceof Error &&
-        e.name !== 'AbortError'
+        !state.alive ||
+        serial !== state.serial ||
+        !(e instanceof Error) ||
+        e.name === 'AbortError'
       )
-        setError(e.message);
+        return;
+      setError(e);
+      setWarningFor(null);
+      if (name === 'replace' || name === 'lock') setMealId(null);
+      if (name === 'save' && e instanceof ApiError && (e.status === 0 || e.status >= 500)) {
+        setCommitState('uncertain');
+        const current = viewRef.current;
+        if (current)
+          try {
+            const checked = await periodApi.get(current.id, controller.signal);
+            if (state.alive && serial === state.serial) {
+              if (checked.savedPlanIds.length) afterSaved(checked);
+              else {
+                receive(checked, 'menu');
+                setCommitState('checked');
+                setError(
+                  new ApiError(
+                    0,
+                    'Ответ на сохранение не получен. Запись ещё не подтверждена; можно повторить вручную без создания второго меню.',
+                  ),
+                );
+              }
+            }
+          } catch {
+            /* Read failure never automatically retries a mutation. */
+          }
+      }
     } finally {
-      if (alive.current && serial === requestNumber.current) {
-        locked.current = false;
-        setBusy(false);
+      if (state.alive && serial === state.serial) {
+        state.busy = false;
+        setPhase(null);
       }
     }
   }
-  function receive(
-    next: PeriodView,
-    nextTab: 'menu' | 'shopping' | 'options' = tab === 'options' ? 'menu' : tab,
-  ) {
-    setView(next);
-    setAcceptWarnings(false);
-    setTabValue(nextTab);
-    setParams({ id: next.id, tab: nextTab }, { replace: true });
-  }
-  function generate(event?: React.FormEvent) {
-    event?.preventDefault();
-    const options: PlanningOptions = {
-      from,
-      to: shiftDate(from, length - 1),
-      budgetRub: budget.trim() ? Number(budget) : null,
-      allowedChainIds: selectedChains,
-      city,
-      purchaseMode: split ? 'TWO_CHAINS' : 'SINGLE_CHAIN',
-      maxPreparationTimeByMeal: times,
-      maxRecipeOccurrences: repeat,
-      minRepeatGapDays: gap,
-      allowEstimatedPrices: estimated,
-      minSplitSavingRub: saving,
-      seed: 0,
-      usePantry,
-      householdMemberIds: selectedMembers,
+  useEffect(() => {
+    const state = lifecycle.current;
+    if (!requestedId) {
+      if (viewRef.current) {
+        viewRef.current = null;
+        setView(null);
+        setDraft(readPlanningPreferences(userId));
+        setTab('options');
+        setError(null);
+        setMealId(null);
+        setWarningFor(null);
+      }
+      return;
+    }
+    if (viewRef.current?.id === requestedId) return;
+    const controller = new AbortController(),
+      serial = ++state.serial;
+    state.busy = true;
+    state.abort = controller;
+    setPhase('load');
+    setError(null);
+    viewRef.current = null;
+    setView(null);
+    periodApi
+      .get(requestedId, controller.signal)
+      .then((next) => {
+        if (!state.alive || serial !== state.serial) return;
+        receive(
+          next,
+          params.get('tab') === 'shopping'
+            ? 'shopping'
+            : params.get('tab') === 'options'
+              ? 'options'
+              : 'menu',
+        );
+        if (!next.savedPlanIds.length && pendingCommit(userId, next.id)) setCommitState('checked');
+      })
+      .catch((e) => {
+        if (state.alive && serial === state.serial && e.name !== 'AbortError') setError(e);
+      })
+      .finally(() => {
+        if (state.alive && serial === state.serial) {
+          state.busy = false;
+          setPhase(null);
+        }
+      });
+    return () => {
+      controller.abort();
+      if (serial === state.serial) {
+        state.serial++;
+        state.busy = false;
+      }
     };
-    const invalid = validatePlanningOptions(options);
-    if (invalid) {
-      setError(invalid);
+  }, [requestedId, userId]);
+  // Browser Back/Forward may change the view without a new generation ID.
+  useEffect(() => {
+    if (viewRef.current?.id === requestedId) {
+      const next = params.get('tab');
+      if (next === 'menu' || next === 'shopping' || next === 'options') setTab(next);
+    }
+  }, [params, requestedId]);
+  const saved = !!view?.savedPlanIds.length,
+    expired = !!view && Date.parse(view.expiresAt) <= now;
+  const block = view ? planningBlock(view, profile?.dailyCalorieTarget, now) : null;
+  const profileChanged =
+    !!view &&
+    profile?.dailyCalorieTarget !==
+      (view.result.participants?.find((p) => p.accountOwner)?.dailyCalorieTarget ??
+        view.result.dailyCalorieTarget);
+  let edited = true;
+  try {
+    edited =
+      !view ||
+      !Number.isInteger(draft.days) ||
+      draft.days < 1 ||
+      draft.days > 14 ||
+      !sameOptions(draftOptions(draft), view.result.options);
+  } catch {
+    /* Invalid draft needs correction, not a commit. */
+  }
+  const missing = view ? missingMeals(view) : [];
+  const meal = view?.result.entries.find((e) => e.id === mealId);
+  const recovery = error ? errorRecovery(error) : null;
+  const revisionKey = view ? `${view.id}:${view.revision}` : '';
+  useEffect(() => {
+    setWarningFor(null);
+  }, [revisionKey]);
+  function changeDraft(next: PlanningDraft) {
+    setDraft(next);
+    setInvalid(null);
+    setError(null);
+  }
+  function editConditions() {
+    setMealId(null);
+    setWarningFor(null);
+    switchTab('options');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function newPlan() {
+    lifecycle.current.abort?.abort();
+    lifecycle.current.serial++;
+    lifecycle.current.busy = false;
+    setPhase(null);
+    viewRef.current = null;
+    setView(null);
+    setTab('options');
+    setParams({}, { replace: true });
+    setDraft(readPlanningPreferences(userId));
+    chooseDefault.current = false;
+    setError(null);
+    setInvalid(null);
+    setMealId(null);
+    setWarningFor(null);
+    setCommitState('idle');
+  }
+  function generate(options?: PlanningOptions) {
+    let value: PlanningOptions;
+    try {
+      if (!options && (!Number.isInteger(draft.days) || draft.days < 1 || draft.days > 14))
+        throw new Error('Выберите период от 1 до 14 дней.');
+      value = options || draftOptions(draft);
+    } catch (e) {
+      setInvalid(e instanceof Error ? e.message : 'Проверьте период.');
+      return;
+    }
+    const message = validatePlanningOptions(value);
+    if (message) {
+      setInvalid(message);
+      return;
+    }
+    if (household.isError && value.householdMemberIds?.length) {
+      setInvalid('Сначала загрузите выбранные профили семьи.');
+      return;
+    }
+    if (
+      household.data &&
+      value.householdMemberIds?.some((id) => !household.data.some((m) => m.id === id))
+    ) {
+      setInvalid('Пересмотрите состав семьи: выбранный профиль недоступен.');
+      return;
+    }
+    if (!chains.data || value.allowedChainIds.some((id) => !chains.data.some((c) => c.id === id))) {
+      setInvalid('Выберите доступные магазины.');
       return;
     }
     run(
-      (signal) => periodApi.create(options, signal),
+      'generate',
+      (signal) => periodApi.create(value, signal),
       (next) => {
+        savePlanningPreferences(userId, fromOptions(next.result.options));
+        setCommitState('idle');
         receive(next, 'menu');
-        setDay(0);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       },
     );
   }
-  function retryPeriod(allowRepeats: boolean) {
-    if (!view || saved) return;
-    const options = {
-      ...view.result.options,
-      maxRecipeOccurrences: allowRepeats
-        ? Math.min(14, periodDates.length)
-        : view.result.options.maxRecipeOccurrences,
-      minRepeatGapDays: allowRepeats ? 0 : view.result.options.minRepeatGapDays,
-    };
-    run(
-      (signal) => periodApi.create(options, signal),
-      (next) => {
-        setRepeat(next.result.options.maxRecipeOccurrences);
-        setGap(next.result.options.minRepeatGapDays);
-        receive(next, 'menu');
-        setDay(0);
-      },
-    );
-  }
-  async function save() {
+  function reload() {
     if (!view) return;
-    let key = commitKeys.current.get(view.id);
-    if (!key) {
-      key = crypto.randomUUID();
-      commitKeys.current.set(view.id, key);
+    run(
+      'reload',
+      (s) => periodApi.get(view.id, s),
+      (next) => {
+        if (next.savedPlanIds.length) afterSaved(next);
+        else {
+          receive(next, 'menu');
+          setCommitState(pendingCommit(userId, next.id) ? 'checked' : 'idle');
+        }
+      },
+    );
+  }
+  function refresh() {
+    if (!view) return;
+    run(
+      'refresh',
+      (s) => periodApi.refresh(view, s),
+      (next) => receive(next, tab),
+    );
+  }
+  function requestSave(accept = false) {
+    const current = viewRef.current;
+    if (!current || current.savedPlanIds.length || busy || !online) return;
+    if (planningBlock(current, profile?.dailyCalorieTarget, Date.now()) || edited) {
+      setInvalid('Перед сохранением пересчитайте меню с актуальными условиями.');
+      return;
+    }
+    if (commitState === 'uncertain') {
+      reload();
+      return;
+    }
+    if (current.result.issues.length && !accept) {
+      setWarningFor(`${current.id}:${current.revision}`);
+      return;
+    }
+    if (accept && warningFor !== `${current.id}:${current.revision}`) {
+      setWarningFor(null);
+      setError(new Error('Меню изменилось. Проверьте обновлённый вариант перед сохранением.'));
+      return;
     }
     run(
-      (signal) => periodApi.commit(view, key!, acceptWarnings, signal),
-      (next) => {
-        receive(next, 'shopping');
-        setSelectedDate(next.result.options.from);
-        notify(`Сохранено дней: ${next.savedPlanIds.length}`);
-        for (const item of next.result.days)
-          client.invalidateQueries({ queryKey: mealPlanKey(profile!.userId, item.date) });
-        invalidateShopping(client, profile!.userId);
-      },
+      'save',
+      (s) => periodApi.commit(current, commitKey(userId, current.id, keys.current), accept, s),
+      afterSaved,
     );
   }
-  const saved = Boolean(view?.savedPlanIds.length),
-    expired = Boolean(view && Date.parse(view.expiresAt) <= now);
-  const profileChanged = Boolean(
-    view &&
-    profile?.dailyCalorieTarget !==
-      (view.result.participants?.find((p) => p.accountOwner)?.dailyCalorieTarget ??
-        view.result.dailyCalorieTarget),
-  );
-  const disabled = busy || !online || expired || profileChanged || saved;
-  const periodDates = view
-    ? Array.from(
-        {
-          length:
-            Math.round(
-              (Date.parse(view.result.options.to) - Date.parse(view.result.options.from)) /
-                86400000,
-            ) + 1,
-        },
-        (_, index) => shiftDate(view.result.options.from, index),
-      )
-    : [];
-  const selectedDayDate = periodDates[Math.min(day, periodDates.length - 1)];
-  const selectedDay =
-    view && selectedDayDate
-      ? (view.result.days.find((item) => item.date === selectedDayDate) ?? {
-          date: selectedDayDate,
-          entries: [],
-          nutrition: { calories: 0, protein: 0, fat: 0, carbs: 0 },
-          calorieDeviation: 0,
-          withinTargetTolerance: false,
-        })
-      : null;
-  const basket = view?.result.shopping;
-  const missing = view ? missingMeals(view) : [];
-  const blockReason = view ? saveBlockReason(view, profile?.dailyCalorieTarget, now) : null;
-  function showGaps() {
-    const first = missing[0];
-    if (first) setDay(Math.max(0, periodDates.indexOf(first.date)));
-    setTab('menu');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  function retryWhole() {
+    if (!view) return;
+    if (expired || profileChanged) {
+      editConditions();
+      return;
+    }
+    setMealId(null);
+    run(
+      'regenerate',
+      (s) => periodApi.regenerate(view, s),
+      (next) => receive(next, 'menu'),
+    );
   }
-  function editOptions() {
-    setAdvanced(true);
-    setTab('options');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  function applyRecovery() {
+    if (!recovery) return;
+    switch (recovery.action) {
+      case 'refresh':
+        refresh();
+        break;
+      case 'reload':
+        reload();
+        break;
+      case 'create':
+        editConditions();
+        break;
+      case 'calendar':
+        navigate(`/week?date=${view?.result.options.from || draft.from}`);
+        break;
+      case 'login':
+        navigate('/login');
+        break;
+      default:
+        break;
+    }
   }
-  const savePanel = view && (
-    <section className="panel period-save" aria-label="Сохранение меню">
-      {saved ? (
-        <div className="period-saved">
-          <span className="eyebrow">МЕНЮ В КАЛЕНДАРЕ</span>
-          <h2>Сохранено дней: {view.savedPlanIds.length}.</h2>
-          <p>Список покупок готов. Отмечайте продукты по мере покупки.</p>
-          <Link className="text-link" to={`/week?date=${view.result.options.from}`}>
-            Открыть меню недели
-          </Link>
-        </div>
-      ) : (
-        <>
-          <h2>Сохранить меню в календарь</h2>
-          {blockReason ? (
-            <div className="period-save-block" role="status">
-              <strong>{blockReason}</strong>
-              {missing.length > 0 ? (
-                <p>Галочка согласия с приблизительными ценами не заполняет пропущенные блюда.</p>
-              ) : (
-                <p>Список можно посмотреть, но перед сохранением нужно обновить подбор.</p>
-              )}
-              <div className="period-actions">
-                {missing.length > 0 && (
-                  <button className="button secondary" onClick={showGaps}>
-                    Показать незаполненный день
-                  </button>
-                )}
-                {expired || profileChanged ? (
-                  <button
-                    className="button secondary"
-                    disabled={busy || !online}
-                    onClick={() => generate()}
-                  >
-                    Создать свежий подбор
-                  </button>
-                ) : (
-                  <button className="button secondary" onClick={editOptions}>
-                    Изменить настройки подбора
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : view.result.issues.length > 0 ? (
-            <div className="period-save-warnings">
-              <p>Перед сохранением учтите:</p>
-              <ul>
-                {view.result.issues.map((i) => (
-                  <li key={i.code}>{i.message}</li>
-                ))}
-              </ul>
-              <label className="period-accept">
-                <input
-                  type="checkbox"
-                  checked={acceptWarnings}
-                  onChange={(e) => setAcceptWarnings(e.target.checked)}
-                />
-                Я ознакомился с предупреждениями и сохраняю меню
-              </label>
-            </div>
-          ) : (
-            <p className="muted">Все дни заполнены. Сохраните выбранные блюда одним действием.</p>
-          )}
-          {!online && <p role="status">Нет сети. Сохранение станет доступно после подключения.</p>}
-          <button
-            className="button primary"
-            disabled={
-              busy || !online || !!blockReason || (view.result.issues.length > 0 && !acceptWarnings)
-            }
-            onClick={save}
-          >
-            {busy ? 'Подождите…' : 'Сохранить меню на весь период'}
-          </button>
-          {!blockReason && view.result.issues.length > 0 && !acceptWarnings && (
-            <p className="caption">Для сохранения отметьте согласие с предупреждениями выше.</p>
-          )}
-        </>
-      )}
-    </section>
-  );
+  let label = 'Сохранить меню и перейти к покупкам',
+    message = 'Все дни сохраняются вместе.',
+    action = () => requestSave();
+  if (saved) {
+    label = 'Открыть меню недели';
+    message = `Меню сохранено на ${view!.savedPlanIds.length} дней`;
+    action = () => navigate(`/week?date=${view!.result.options.from}`);
+  } else if (commitState === 'uncertain') {
+    label = 'Проверить сохранение';
+    message = 'Не удалось подтвердить результат сохранения. Сначала проверим состояние меню.';
+    action = reload;
+  } else if (recovery && recovery.action !== 'none') {
+    label = recovery.label;
+    message = error!.message;
+    action = applyRecovery;
+  } else if (block) {
+    message = expired
+      ? 'Срок предпросмотра истёк. Нужен новый подбор.'
+      : incompleteSummary(view!) || block;
+    label =
+      expired || profileChanged
+        ? 'Создать новый подбор'
+        : missing.length && view!.result.searchStatus === 'LIMIT_REACHED'
+          ? 'Повторить подбор всего периода'
+          : 'Изменить условия';
+    action = expired
+      ? editConditions
+      : missing.length && view!.result.searchStatus === 'LIMIT_REACHED'
+        ? retryWhole
+        : editConditions;
+  } else if (edited) {
+    label = 'Пересчитать меню';
+    message = 'Настройки изменены, меню ещё не пересчитано.';
+    action = () => generate();
+  } else if (commitState === 'checked') {
+    label = 'Повторить сохранение';
+    message = 'Предыдущее сохранение пока не подтверждено. Повтор не создаст второе меню.';
+  } else if (view?.result.issues.length) {
+    message = 'Есть предупреждения — покажем их перед сохранением.';
+  }
+  if (phase === 'save') label = 'Сохраняем меню…';
+  else if (busy) label = 'Обновляем…';
   return (
-    <>
-      {tab !== 'shopping' && (
+    <div className={`planning-flow ${view && tab !== 'options' ? 'with-planning-action' : ''}`}>
+      {tab === 'options' && (
         <PageHeading
-          eyebrow="ПИТАНИЕ И ПОКУПКИ ВМЕСТЕ"
-          title="Меню под ваш бюджет"
-          description="Подбор на 1–14 дней: ограничения из профиля, общий список продуктов и целые упаковки."
+          title="Составить меню"
+          description="Укажите людей, период и бюджет. Остальное мы подберём."
         />
+      )}
+      {view && !view.result.options.balancedMeals && (
+        <Notice>
+          Этот подбор создан по прежним правилам количества. Сохранённые данные не меняются. Для
+          индивидуальных граммов, гарниров и учёта клетчатки создайте новый подбор.
+          <button
+            className="button"
+            disabled={busy}
+            onClick={() => {
+              newPlan();
+              setDraft((d) => ({ ...d, balanced: true }));
+            }}
+          >
+            Новый подбор с гарнирами
+          </button>
+        </Notice>
       )}
       {!profile?.dailyCalorieTarget && (
         <Notice>
-          <Link to="/onboarding">Заполните анкету</Link>, чтобы рассчитать суточную цель.
+          Чтобы составить меню, сначала задайте свою суточную норму.
+          <Link className="text-link" to="/onboarding">
+            Рассчитать норму
+          </Link>
         </Notice>
       )}
-      <div className="period-tabs" role="tablist" aria-label="Недельный подбор">
-        {(['options', 'menu', 'shopping'] as const).map((key, i) => (
-          <button
-            key={key}
-            role="tab"
-            id={`period-tab-${key}`}
-            aria-controls={`period-${key}`}
-            aria-selected={tab === key}
-            disabled={key !== 'options' && !view}
-            className={`button ${tab === key ? 'primary' : 'secondary'}`}
-            onClick={() => setTab(key)}
-          >
-            {i + 1}. {key === 'options' ? 'Настройки' : key === 'menu' ? 'Меню' : 'Покупки'}
-          </button>
-        ))}
-      </div>
       {error && (
-        <div className="notice warning" role="alert">
-          {error}
-          {!view && <Link to="/shopping?view=calendar">Открыть покупки по сохранённым меню</Link>}
-          {view && (
-            <button
-              className="text-button"
-              disabled={busy || !online}
-              onClick={() => run((signal) => periodApi.get(view.id, signal), receive)}
-            >
-              Обновить предпросмотр
-            </button>
-          )}
+        <div role="alert" className="planning-error">
+          <Notice tone="warning">
+            <p>{error.message}</p>
+            {recovery?.action !== 'none' && recovery && view && (
+              <button className="text-button" disabled={busy || !online} onClick={applyRecovery}>
+                {recovery.label}
+              </button>
+            )}
+          </Notice>
         </div>
       )}
-      {profileChanged && !saved && (
-        <Notice>Суточная цель изменилась. Создайте новый подбор с актуальными настройками.</Notice>
-      )}
-
-      <section
-        id="period-options"
-        role="tabpanel"
-        aria-labelledby="period-tab-options"
-        hidden={tab !== 'options'}
-      >
-        <form className="panel period-options" onSubmit={generate}>
-          <div className="period-fields">
-            <label>
-              Начало периода
-              <input type="date" required value={from} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label>
-              Дней
-              <input
-                type="number"
-                min="1"
-                max="14"
-                required
-                value={length}
-                onChange={(e) => setLength(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Бюджет на покупки, ₽
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="Можно не задавать"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-              />
-            </label>
-            <label>
-              Город
-              <input
-                required
-                maxLength={120}
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-              />
-            </label>
-          </div>
-          <fieldset className="household-picker">
-            <legend>Для кого готовим</legend>
-            <p>Вы · {number(profile?.dailyCalorieTarget || 0)} ккал в день — всегда включены.</p>
-            {household.isPending && <Loading />}
-            {household.error && (
-              <Notice>
-                Не удалось загрузить профили семьи. Доступен подбор для вас; для семейного подбора
-                повторите загрузку.
-                <button type="button" className="text-button" onClick={() => household.refetch()}>
-                  Повторить
-                </button>
-              </Notice>
-            )}
-            <div className="period-checks">
-              {household.data?.map((m) => (
-                <label key={m.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedMembers.includes(m.id)}
-                    onChange={(e) =>
-                      setSelectedMembers((ids) =>
-                        e.target.checked ? [...ids, m.id] : ids.filter((id) => id !== m.id),
-                      )
-                    }
-                  />
-                  {m.name} · {number(m.dailyCalorieTarget)} ккал
-                </label>
-              ))}
-            </div>
-            <p>Бюджет — на всех. Аллергии и исключения применяются ко всему общему меню.</p>
-            <Link className="text-link" to="/household">
-              Добавить человека или изменить ограничения
-            </Link>
-          </fieldset>
-          <fieldset>
-            <legend>Доступные сети</legend>
-            {chains.isPending ? (
-              <Loading />
-            ) : chains.error ? (
-              <Notice>
-                Не удалось загрузить сети.{' '}
-                <button type="button" className="text-button" onClick={() => chains.refetch()}>
-                  Повторить
-                </button>
-              </Notice>
-            ) : (
-              <div className="period-checks">
-                {chains.data?.map((chain) => (
-                  <label key={chain.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedChains.includes(chain.id)}
-                      onChange={(e) =>
-                        setSelectedChains((current) =>
-                          e.target.checked
-                            ? [...current, chain.id]
-                            : current.filter((id) => id !== chain.id),
-                        )
-                      }
-                    />
-                    {chain.name}
-                  </label>
-                ))}
-              </div>
-            )}
-          </fieldset>
-          <div className="period-fields">
-            {meals.map((meal) => (
-              <label key={meal}>
-                {mealLabels[meal]}: до, мин
-                <input
-                  type="number"
-                  min="0"
-                  max="240"
-                  required
-                  value={times[meal]}
-                  onChange={(e) =>
-                    setTimes((current) => ({ ...current, [meal]: Number(e.target.value) }))
-                  }
-                />
-              </label>
-            ))}
-          </div>
-          <details open={advanced} onToggle={(e) => setAdvanced(e.currentTarget.open)}>
-            <summary>Повторы и покупки</summary>
-            <label className="pantry-check">
-              <input
-                type="checkbox"
-                checked={usePantry}
-                onChange={(e) => setUsePantry(e.target.checked)}
-              />
-              Учитывать запасы дома
-            </label>
-            <Link to="/pantry">Сверить домашние запасы</Link>
-            <div className="period-fields">
-              <label>
-                Один рецепт: максимум раз
-                <input
-                  type="number"
-                  min="1"
-                  max="14"
-                  value={repeat}
-                  onChange={(e) => setRepeat(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Полных дней между повторами
-                <input
-                  type="number"
-                  min="0"
-                  max="14"
-                  value={gap}
-                  onChange={(e) => setGap(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Минимальная экономия для второй сети, ₽
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={saving}
-                  onChange={(e) => setSaving(Number(e.target.value))}
-                />
-              </label>
-            </div>
-            <div className="period-checks">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={split}
-                  onChange={(e) => setSplit(e.target.checked)}
-                />
-                Разрешить покупки максимум в двух сетях
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={estimated}
-                  onChange={(e) => setEstimated(e.target.checked)}
-                />
-                Разрешить приблизительные цены
-              </label>
-            </div>
-          </details>
-          <p className="muted">
-            Аллергии, исключения и оборудование — из профиля. Цель:{' '}
-            {profile?.dailyCalorieTarget ?? 'не задана'} ккал. Изменения формы применяются после
-            нового подбора.
-          </p>
-          <Link to="/planning-preferences">Изменить аллергии, исключения и оборудование</Link>
-          <button
-            className="button primary"
-            disabled={busy || !online || !profile?.dailyCalorieTarget || !selectedChains.length}
-          >
-            <Sparkles size={17} />
-            {busy ? 'Подбираем…' : 'Подобрать меню'}
+      {phase === 'load' && !view && <Loading />}
+      {!view && requestedId && error ? (
+        <section className="panel planning-unavailable">
+          <h1>Этот вариант сейчас недоступен</h1>
+          <p>Создайте новый подбор или откройте покупки по сохранённому меню.</p>
+          <button className="button primary" onClick={newPlan}>
+            Создать новый подбор
           </button>
-        </form>
-      </section>
-      {view && (
+          {error instanceof ApiError && (error.status === 0 || error.status >= 500) && (
+            <button
+              className="button secondary"
+              disabled={busy || !online}
+              onClick={() =>
+                run(
+                  'load',
+                  (s) => periodApi.get(requestedId!, s),
+                  (next) => receive(next, params.get('tab') === 'shopping' ? 'shopping' : 'menu'),
+                )
+              }
+            >
+              Повторить загрузку
+            </button>
+          )}
+          <Link className="button secondary" to="/shopping?view=calendar">
+            Открыть сохранённые покупки
+          </Link>
+        </section>
+      ) : null}
+      {tab === 'options' && (!requestedId || view) && (
         <>
-          {tab === 'options' && (
-            <div className="period-summary" aria-live="polite">
-              <div className="panel">
-                <span>Покупки на период</span>
-                <strong>
-                  {basket?.estimatedTotal == null
-                    ? `Известно ${money(basket?.knownPurchaseCost ?? 0)}`
-                    : `≈ ${money(basket.estimatedTotal)}`}
-                </strong>
-                <small>{budgetLabel[basket!.budgetStatus]}</small>
-              </div>
-              <div className="panel">
-                <span>Бюджет</span>
-                <strong>
-                  {view.result.options.budgetRub == null
-                    ? 'Не задан'
-                    : money(view.result.options.budgetRub)}
-                </strong>
-                <small>
-                  {labelDate(view.result.options.from)} — {labelDate(view.result.options.to)}
-                </small>
-              </div>
-              <div className="panel">
-                <span>Продукты с ценой</span>
-                <strong>
-                  {basket!.pricedProducts} из {basket!.items.length}
-                </strong>
-                <small>
-                  Приблизительных: {basket!.estimatedProducts} · неизвестных:{' '}
-                  {basket!.unknownProducts}
-                </small>
-              </div>
-            </div>
-          )}
-          {tab !== 'shopping' && blockReason && (missing.length === 0 || tab === 'options') && (
-            <div className="notice warning period-incomplete" role="status">
-              <strong>{blockReason}</strong>
-              <button className="text-button" onClick={editOptions}>
-                Изменить настройки
-              </button>
-            </div>
-          )}
-          {tab !== 'shopping' && view.result.issues.length > 0 && (
-            <details className="panel period-issues">
-              <summary>Предупреждения: {view.result.issues.length}</summary>
-              {view.result.issues.map((issue) => (
-                <p key={issue.code}>{issue.message}</p>
-              ))}
-            </details>
-          )}
-          <section
-            id="period-menu"
-            role="tabpanel"
-            aria-labelledby="period-tab-menu"
-            hidden={tab !== 'menu'}
-          >
-            <section className="panel period-overview" aria-label="Меню на весь период">
-              <header>
-                <div>
-                  <span className="eyebrow">
-                    {saved
-                      ? 'СОХРАНЕНО В КАЛЕНДАРЕ'
-                      : missing.length
-                        ? 'ПОДБОР НЕ ЗАВЕРШЁН'
-                        : 'ВЕСЬ ПЕРИОД ГОТОВ'}
-                  </span>
-                  <h2>
-                    Меню на {periodDates.length} дн.
-                    {(view.result.participants?.length || 0) > 1
-                      ? ` · ${view.result.participants!.length} чел.`
-                      : ''}
-                  </h2>
-                  <p>
-                    Подбор сразу заполняет весь период. Выбор дня ниже — только просмотр и замена
-                    блюд. Сохранять каждый день отдельно не нужно.
-                  </p>
-                </div>
-                <div className="period-overview-cost">
-                  <span>
-                    Покупки{' '}
-                    {basket!.estimatedTotal == null
-                      ? `от ${money(basket!.knownPurchaseCost)}`
-                      : `≈ ${money(basket!.estimatedTotal)}`}
-                  </span>
-                  <small>{budgetLabel[basket!.budgetStatus]}</small>
-                </div>
-                <strong className="period-ready-count">
-                  {periodDates.filter((date) => !missing.some((m) => m.date === date)).length} из{' '}
-                  {periodDates.length} дней заполнено
-                </strong>
-              </header>
-              {missing.length > 0 && !saved && (
-                <div className="period-retry">
-                  {view.result.searchStatus === 'LIMIT_REACHED' ? (
-                    <>
-                      <strong>Поиск остановился до заполнения всех дней.</strong>
-                      <p>
-                        Это не означает, что подходящих блюд нет. Повторите подбор сразу на весь
-                        период с теми же настройками. Будет создан новый вариант; закрепления
-                        текущего варианта не переносятся.
-                      </p>
-                      <button
-                        className="button primary"
-                        disabled={busy || !online || profileChanged}
-                        onClick={() => retryPeriod(false)}
-                      >
-                        <RefreshCw size={17} />
-                        {busy ? 'Подбираем весь период…' : 'Повторить подбор всего периода'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <strong>На часть дней не хватило подходящих блюд.</strong>
-                      <p>
-                        Можно создать новый вариант на весь период: разрешить повтор блюда до{' '}
-                        {periodDates.length} раз, в том числе в соседние дни. Бюджет, время готовки
-                        и ограничения питания сохранятся. Закреплённые блюда текущего варианта не
-                        переносятся; сохранённые меню в календаре не меняются.
-                      </p>
-                      <button
-                        className="button primary"
-                        disabled={busy || !online || profileChanged}
-                        onClick={() => retryPeriod(true)}
-                      >
-                        <Sparkles size={17} />
-                        {busy ? 'Подбираем весь период…' : 'Подобрать весь период с повторами'}
-                      </button>
-                      <p className="caption">
-                        Если блюд всё ещё недостаточно, покажем оставшиеся пропуски — увеличьте
-                        время готовки или добавьте рецепты.
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="period-overview-actions">
-                <button
-                  className="button primary"
-                  onClick={() =>
-                    document
-                      .getElementById('period-menu-save')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          <PlanningSetupForm
+            draft={draft}
+            onChange={changeDraft}
+            members={household.data || []}
+            chains={chains.data || []}
+            membersLoading={household.isPending}
+            chainsLoading={chains.isPending}
+            membersError={household.isError}
+            chainsError={chains.isError}
+            retryMembers={() => household.refetch()}
+            retryChains={() => chains.refetch()}
+            busy={busy}
+            online={online}
+            target={profile?.dailyCalorieTarget}
+            onSubmit={() => generate()}
+            onCancel={
+              view
+                ? () => {
+                    setDraft(fromOptions(view.result.options));
+                    setError(null);
+                    switchTab('menu');
                   }
-                >
-                  {saved ? 'Результат сохранения' : 'К сохранению всего периода'}
-                </button>
-                <button className="button secondary" onClick={() => setTab('shopping')}>
-                  <ShoppingBasket size={17} />
-                  Что купить
-                </button>
-              </div>
-              <div className="period-overview-days">
-                {periodDates.map((date, i) => {
-                  const entries = view.result.entries.filter((entry) => entry.date === date);
-                  return (
-                    <article
-                      className={`period-overview-day ${day === i ? 'is-selected' : ''}`}
-                      key={date}
-                    >
-                      <header>
-                        <h3>{labelDate(date)}</h3>
-                        <span>
-                          {missing.some((m) => m.date === date) ? 'Есть пропуски' : 'Готово'}
-                        </span>
-                      </header>
-                      <dl>
-                        {meals.map((meal) => {
-                          const entry = entries.find((e) => e.mealType === meal);
-                          return (
-                            <div key={meal}>
-                              <dt>{mealLabels[meal]}</dt>
-                              <dd className={entry ? '' : 'period-overview-gap'}>
-                                {entry?.recipe.name || 'Не удалось подобрать'}
-                              </dd>
-                            </div>
-                          );
-                        })}
-                      </dl>
-                      <button
-                        className="text-button"
-                        aria-pressed={day === i}
-                        onClick={() => {
-                          setDay(i);
-                          document
-                            .getElementById('period-day-detail')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }}
-                        aria-label={`Подробнее: ${labelDate(date)}`}
-                      >
-                        Посмотреть и изменить
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-            {tab === 'menu' && <div id="period-menu-save">{savePanel}</div>}
-            {selectedDay && (
-              <>
-                {(selectedDay.people?.length || 0) > 1 && (
-                  <section className="panel household-day">
-                    <h3>Питание каждого</h3>
-                    {selectedDay.people!.map((p) => (
-                      <p key={p.participantId}>
-                        <strong>{p.name}</strong>: {number(p.nutrition.calories)} /{' '}
-                        {number(p.dailyCalorieTarget)} ккал
-                      </p>
-                    ))}
-                    <p className="caption">
-                      Ниже количество порций на всех; индивидуальная доля указана под каждым блюдом.
-                    </p>
-                  </section>
-                )}
-                <div className="period-day-heading" id="period-day-detail">
-                  <h2>{labelDate(selectedDay.date)}</h2>
-                  <span>
-                    {number(selectedDay.nutrition.calories)} / {view.result.dailyCalorieTarget} ккал
-                    {(view.result.participants?.length || 0) > 1 ? ' на всех' : ''}
-                  </span>
-                </div>
-                <div className="period-meals">
-                  {meals.map((meal) => {
-                    const entry = selectedDay.entries.find((e) => e.mealType === meal);
-                    if (!entry)
-                      return (
-                        <article className="panel period-missing-meal" key={meal}>
-                          <span className="eyebrow">{mealLabels[meal]}</span>
-                          <h3>Блюдо не подобрано</h3>
-                          <p>При текущих ограничениях подходящего блюда не нашлось.</p>
-                          <button className="button secondary" onClick={editOptions}>
-                            Настроить подбор
-                          </button>
-                        </article>
-                      );
-                    return (
-                      <article className="panel" key={entry.id}>
-                        {entry.coverImageUrl && (
-                          <img
-                            className="period-cover"
-                            src={entry.coverImageUrl}
-                            alt={entry.recipe.name}
-                            loading="lazy"
-                          />
-                        )}
-                        <span className="eyebrow">{mealLabels[entry.mealType]}</span>
-                        <h3>
-                          <Link to={`/recipes/${entry.recipe.recipeId}`}>{entry.recipe.name}</Link>
-                        </h3>
-                        <p>
-                          {number(entry.portions, 2)} порц. · {entry.recipe.preparationTimeMin} мин
-                        </p>
-                        <p>
-                          {number(entry.recipe.nutritionPerServing.calories * entry.portions)} ккал
-                        </p>
-                        {(entry.personPortions?.length || 0) > 1 && (
-                          <ul className="household-portions" aria-label="Порции по людям">
-                            {entry.personPortions!.map((p) => (
-                              <li key={p.participantId}>
-                                <strong>{p.name}</strong>: {number(p.portions, 2)} порц. ·{' '}
-                                {number(p.nutrition.calories)} ккал
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <details>
-                          <summary>Почему это блюдо</summary>
-                          {entry.explanations.map((text) => (
-                            <p key={text}>{text}</p>
-                          ))}
-                          <Link to={`/recipes/${entry.recipe.recipeId}/planning`}>
-                            Настройки порций и группы блюда
-                          </Link>
-                        </details>
-                        <div className="period-actions">
-                          <button
-                            className="button secondary"
-                            disabled={disabled || entry.locked}
-                            onClick={() =>
-                              run(
-                                (signal) => periodApi.alternatives(view, entry, signal),
-                                (list) => {
-                                  setAlternativeFor(entry);
-                                  setAlternatives(list);
-                                },
-                              )
-                            }
-                          >
-                            Заменить
-                          </button>
-                          <button
-                            className="button secondary"
-                            disabled={disabled}
-                            aria-pressed={entry.locked}
-                            aria-label={`${entry.locked ? 'Открепить' : 'Закрепить'}: ${entry.recipe.name}`}
-                            onClick={() =>
-                              run((signal) => periodApi.lock(view, entry, signal), receive)
-                            }
-                          >
-                            {entry.locked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />}
-                            {entry.locked ? 'Закреплено' : 'Закрепить'}
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-                {!selectedDay.entries.length && (
-                  <Notice>
-                    Для этого дня не удалось подобрать блюда. Измените время или правила повторов.
-                  </Notice>
-                )}
-                <NutritionValues nutrition={selectedDay.nutrition} />
-              </>
-            )}
-            <div className="period-actions">
-              <button
-                className="button secondary"
-                disabled={disabled}
-                onClick={() => run((signal) => periodApi.regenerate(view, signal), receive)}
-              >
-                <RefreshCw size={16} />
-                Пересобрать незакреплённое
-              </button>
-              <button
-                className="button secondary"
-                disabled={disabled}
-                onClick={() => run((signal) => periodApi.refresh(view, signal), receive)}
-              >
-                Обновить оценку цен
-              </button>
-              <button className="button primary" onClick={() => setTab('shopping')}>
-                <ShoppingBasket size={17} />К покупкам
-              </button>
-            </div>
-          </section>
-          <section
-            id="period-shopping"
-            role="tabpanel"
-            aria-labelledby="period-tab-shopping"
-            hidden={tab !== 'shopping'}
-          >
-            <PeriodShoppingList
-              key={`${profile!.userId}:${view.id}`}
-              view={view}
-              userId={profile!.userId}
-              savePanel={tab === 'shopping' ? savePanel : undefined}
-              onMissing={showGaps}
-            />
-            <div className="purchase-footer">
-              <Link to="/shopping?view=calendar">Рассчитать покупки для другого периода</Link>
-              <Link to="/pantry">Домашние запасы</Link>
-            </div>
-          </section>
-        </>
-      )}
-      {alternativeFor && (
-        <Dialog
-          title={`Заменить: ${alternativeFor.recipe.name}`}
-          onClose={() => {
-            if (!busy) setAlternativeFor(null);
-          }}
-        >
-          <p>Стоимость относится ко всей корзине периода, а не к одной порции.</p>
-          {!alternatives.length && (
+                : undefined
+            }
+            editing={!!view}
+            advanced={advanced}
+            onAdvanced={setAdvanced}
+            invalid={invalid}
+          />
+          {view && edited && (
             <Notice>
-              Подходящих замен нет. Можно изменить время, повторы или добавить рецепты.
+              Настройки изменены, меню ещё не пересчитано. Старый вариант не будет сохранён с новыми
+              условиями.
             </Notice>
           )}
-          {alternatives.map((item, i) => (
-            <article className="period-alternative" key={`${item.recipeId}-${item.portions}`}>
-              <h3>{item.name}</h3>
+        </>
+      )}
+      {view && tab !== 'options' && (
+        <>
+          <header className="planning-result-heading">
+            <div>
+              <span className="eyebrow">
+                {saved
+                  ? 'МЕНЮ СОХРАНЕНО'
+                  : missing.length
+                    ? 'НУЖНО ЗАВЕРШИТЬ ПОДБОР'
+                    : 'ВЕСЬ ПЕРИОД ГОТОВ'}
+              </span>
+              {tab === 'shopping' ? (
+                <h2>
+                  Меню на {view.result.days.length} дн. · {view.result.participants?.length || 1}{' '}
+                  чел.
+                </h2>
+              ) : (
+                <h1>
+                  Меню на {view.result.days.length} дн. · {view.result.participants?.length || 1}{' '}
+                  чел.
+                </h1>
+              )}
               <p>
-                {item.preparationTimeMin} мин · {number(item.portions, 2)} порц. · день{' '}
-                {number(item.dayNutrition.calories)} ккал
+                {labelDate(view.result.options.from)} — {labelDate(view.result.options.to)}
               </p>
-              <p>
-                Покупки: {money(item.newPurchaseCost)}
-                {item.deltaPurchaseCost != null &&
-                  ` (${item.deltaPurchaseCost >= 0 ? '+' : ''}${money(item.deltaPurchaseCost)})`}{' '}
-                · {budgetLabel[item.budgetStatus]}
-              </p>
-              <button
-                className="button primary"
-                disabled={busy || !online}
-                onClick={() =>
-                  run(
-                    (signal) => periodApi.replace(view!, alternativeFor, item, signal),
-                    (next) => {
-                      receive(next);
-                      setAlternativeFor(null);
-                    },
-                  )
-                }
-              >
-                Выбрать вариант {i + 1}
+            </div>
+            <div className="planning-result-tools">
+              {saved && (
+                <Link className="button secondary" to="/cooking">
+                  Готовить на несколько дней
+                </Link>
+              )}
+              <button className="button secondary" disabled={busy} onClick={editConditions}>
+                <SlidersHorizontal size={16} />
+                Изменить условия
               </button>
-            </article>
-          ))}
+              {!saved && (
+                <button
+                  className="text-button"
+                  disabled={busy || !online || expired || profileChanged}
+                  onClick={retryWhole}
+                >
+                  <RefreshCw size={16} />
+                  Другой вариант
+                </button>
+              )}
+            </div>
+          </header>
+          {tab === 'menu' && (
+            <section className="panel planning-total" aria-label="Оценка покупок">
+              <strong>{basketSummary(view)}</strong>
+              <p className="caption">
+                Купить: {shoppingProductCount(view)} разных продуктов
+                {view.result.options.maxShoppingProducts != null
+                  ? ` из ${view.result.options.maxShoppingProducts}`
+                  : ''}{' '}
+                · общие упаковки на весь период
+              </p>
+              <span>{budgetSummary(view)}</span>
+              {missing.length > 0 && <small>Сумма относится только к подобранным блюдам.</small>}
+            </section>
+          )}
+          <div className="planning-result-navigation" aria-label="Просмотр результата">
+            <button
+              className={`button ${tab === 'menu' ? 'primary' : 'quiet'}`}
+              aria-pressed={tab === 'menu'}
+              disabled={busy}
+              onClick={() => switchTab('menu')}
+            >
+              Меню
+            </button>
+            <button
+              className={`button ${tab === 'shopping' ? 'primary' : 'quiet'}`}
+              aria-pressed={tab === 'shopping'}
+              disabled={busy}
+              onClick={() => switchTab('shopping')}
+            >
+              <ShoppingBasket size={17} />
+              {saved ? 'Покупки' : 'Предварительный список'}
+            </button>
+          </div>
+          {missing.length > 0 && (
+            <Notice tone="warning">
+              <strong>{incompleteSummary(view)}</strong>
+              <p>
+                {view.result.searchStatus === 'LIMIT_REACHED'
+                  ? 'Расчёт остановился раньше завершения. Повторите его для всего периода; закреплённые блюда сохранятся.'
+                  : 'Подходящих блюд не хватило при выбранных условиях. Можно изменить время готовки или правила повторов.'}
+              </p>
+              {view.result.searchStatus !== 'LIMIT_REACHED' && (
+                <button
+                  className="text-button"
+                  disabled={busy || !online || expired}
+                  onClick={() => setRelax(true)}
+                >
+                  Разрешить больше повторов
+                </button>
+              )}
+            </Notice>
+          )}
+          {invalid && (
+            <p role="alert" className="form-error">
+              {invalid}
+            </p>
+          )}
+          {tab === 'menu' ? (
+            <>
+              <PeriodMenuOverview
+                view={view}
+                busy={busy}
+                onMeal={(entry) => {
+                  setMealId(entry.id);
+                  setAlternatives(null);
+                }}
+                onMissing={() => {
+                  setAdvanced(true);
+                  editConditions();
+                }}
+              />
+              <details className="planning-calculation-details">
+                <summary>
+                  Подробности расчёта и предупреждения ({view.result.issues.length})
+                </summary>
+                {view.result.issues.map((i, n) => (
+                  <p key={`${i.code}-${n}`}>{i.message}</p>
+                ))}
+                <p className="caption">
+                  Оценка на {new Date(view.result.dataAsOf).toLocaleString('ru-RU')}. Цены и наличие
+                  могут отличаться.
+                </p>
+                {!saved && (
+                  <button
+                    className="button secondary"
+                    disabled={busy || !online || expired || profileChanged}
+                    onClick={refresh}
+                  >
+                    Обновить оценку цен и запасов
+                  </button>
+                )}
+              </details>
+            </>
+          ) : (
+            <section id="period-shopping">
+              <PeriodShoppingList
+                key={`${userId}:${view.id}`}
+                view={view}
+                userId={userId}
+                onMissing={() => switchTab('menu')}
+              />
+              <div className="purchase-footer">
+                <Link
+                  to={`/shopping?view=calendar&from=${view.result.options.from}&to=${view.result.options.to}`}
+                >
+                  Пересчитать покупки по текущим ценам и запасам
+                </Link>
+                <Link to="/pantry">Домашние запасы</Link>
+              </div>
+            </section>
+          )}
+          <PlanningActionBar
+            message={
+              !online && !saved
+                ? 'Нет сети. Сохранение станет доступно после подключения.'
+                : message
+            }
+            label={label}
+            onAction={action}
+            disabled={busy || (!online && !saved)}
+            secondary={
+              saved && tab !== 'shopping'
+                ? {
+                    label: 'Открыть покупки',
+                    onClick: () => switchTab('shopping'),
+                  }
+                : undefined
+            }
+          />
+        </>
+      )}
+      {meal && (
+        <MealChoiceDialog
+          entry={meal}
+          alternatives={alternatives}
+          busy={busy}
+          editable={!saved && !expired && !profileChanged && !edited && online}
+          onClose={() => {
+            setMealId(null);
+            setAlternatives(null);
+          }}
+          onAlternatives={() =>
+            run('alternatives', (s) => periodApi.alternatives(view!, meal, s), setAlternatives)
+          }
+          onReplaceComponent={(componentId) =>
+            run(
+              'alternatives',
+              (s) => periodApi.alternatives(view!, meal, s, componentId),
+              (items) => setAlternatives(items.map((a) => ({ ...a, componentId }))),
+            )
+          }
+          onLockComponent={(componentId, locked) =>
+            run(
+              'lock',
+              (s) => periodApi.lockComponent(view!, meal, componentId, locked, s),
+              (next) => receive(next, 'menu'),
+            )
+          }
+          onReplace={(a) =>
+            run(
+              'replace',
+              (s) => periodApi.replace(view!, meal, a, s),
+              (next) => {
+                receive(next, 'menu');
+                setMealId(null);
+              },
+            )
+          }
+          onLock={() =>
+            run(
+              'lock',
+              (s) => periodApi.lock(view!, meal, s),
+              (next) => receive(next, 'menu'),
+            )
+          }
+        />
+      )}
+      {view && warningFor === revisionKey && (
+        <PlanningWarningsDialog
+          view={view}
+          busy={busy}
+          onClose={() => !busy && setWarningFor(null)}
+          onConfirm={() => requestSave(true)}
+        />
+      )}
+      {relax && view && (
+        <Dialog title="Изменить правила повторов?" onClose={() => setRelax(false)}>
+          <p>
+            Создадим новый вариант: один рецепт до {view.result.days.length} раз, без промежутка
+            между днями. Бюджет, время готовки и ограничения питания останутся прежними. Закрепления
+            текущего варианта не переносятся.
+          </p>
+          <div className="period-actions">
+            <button
+              className="button primary"
+              disabled={busy || !online}
+              onClick={() => {
+                setRelax(false);
+                generate({
+                  ...view.result.options,
+                  maxRecipeOccurrences: view.result.days.length,
+                  minRepeatGapDays: 0,
+                });
+              }}
+            >
+              Разрешить повторы и пересчитать
+            </button>
+            <button className="button secondary" onClick={() => setRelax(false)}>
+              Оставить условия
+            </button>
+          </div>
         </Dialog>
       )}
-      {busy && <p role="status">Обрабатываем запрос…</p>}
-    </>
+      {phase && phase !== 'load' && (
+        <p role="status" className="planning-operation">
+          {phase === 'generate'
+            ? 'Составляем меню на весь период…'
+            : phase === 'save'
+              ? 'Сохраняем меню…'
+              : 'Обновляем расчёт…'}
+        </p>
+      )}
+    </div>
   );
 }

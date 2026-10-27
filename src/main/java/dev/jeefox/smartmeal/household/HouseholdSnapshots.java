@@ -23,7 +23,7 @@ public class HouseholdSnapshots {
     }
 
     public void save(UUID planId, List<Participant> people) {
-        if (people.size() < 2) return;
+        if (people.isEmpty()) return;
         String json = mapper.writeValueAsString(people);
         jdbc.update(
                 "insert into meal_plan_households(meal_plan_id,participants) values(:id,cast(:p as"

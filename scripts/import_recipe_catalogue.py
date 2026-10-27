@@ -13,11 +13,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def validate_equipment(codes):
+    allowed={"PAN","POT","OVEN","MICROWAVE","BLENDER","AIR_FRYER"}
+    if not isinstance(codes,list) or any(not isinstance(c,str) for c in codes) or len(codes)!=len(set(codes)) or not set(codes)<=allowed:
+        raise ValueError("Invalid equipment codes")
+
+
+def validate_profile(profile):
+    if not isinstance(profile, dict):
+        raise ValueError("Portion profile must be an object")
+    roles = {"BREAKFAST", "COMPLETE_MAIN", "PROTEIN_MAIN", "SIDE", "VEGETABLE", "SOUP"}
+    if profile.get("role") not in roles or profile.get("yieldQuality") != "ESTIMATED":
+        raise ValueError("Catalogue profiles must have a known role and an explicitly estimated yield")
+    values = {}
+    for key in ("cookedYieldG", "minG", "maxG", "stepG"):
+        value = Decimal(str(profile.get(key)))
+        if not value.is_finite() or value <= 0 or value.as_tuple().exponent < -2:
+            raise ValueError("Invalid portion profile: " + key)
+        values[key] = value
+    if not (values["minG"] <= values["maxG"] <= 1200) or values["stepG"] < 10 or values["cookedYieldG"] > 99999999:
+        raise ValueError("Invalid portion size range")
+    if not isinstance(profile.get("source"), str) or not profile["source"].strip() or len(profile["source"]) > 1000:
+        raise ValueError("Missing yield estimate provenance")
+    if any(type(profile.get(k)) is not bool for k in ("containsStarch", "containsVegetables")):
+        raise ValueError("Portion profile flags must be boolean")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="write the validated catalogue to PostgreSQL")
     parser.add_argument("--container", default="smartmeal-postgres-1")
     parser.add_argument("--file", type=Path, default=ROOT / "data/recipes/starter-recipes.json", help="catalogue JSON file")
+    parser.add_argument("--database", default="smartmeal", help="target PostgreSQL database")
     args = parser.parse_args()
     recipes = json.loads(args.file.read_text())
     keys = set()
@@ -32,6 +59,9 @@ def main():
             raise ValueError("Missing source URL")
         if not recipe["mealTypes"] or not set(recipe["mealTypes"]) <= {"BREAKFAST", "LUNCH", "DINNER", "SNACK"}:
             raise ValueError("Invalid meal types")
+        validate_equipment(recipe.get("equipmentCodes", []))
+        if "portionProfile" in recipe:
+            validate_profile(recipe["portionProfile"])
         product_names = set()
         for position, ingredient in enumerate(recipe["ingredients"], 1):
             if Decimal(str(ingredient["quantityG"])) <= 0 or ingredient["productName"] in product_names:
@@ -55,6 +85,7 @@ DECLARE
     matches integer;
     position integer;
     instructions text;
+    equipment_code text;
     inserted_count integer := 0;
     skipped_count integer := 0;
 BEGIN
@@ -65,6 +96,8 @@ BEGIN
             IF NOT EXISTS (SELECT 1 FROM recipes WHERE id = rid AND name = item->>'name') THEN
                 RAISE EXCEPTION 'Catalogue ID already belongs to another recipe: %', rid;
             END IF;
+            __PROFILE_INSERT__
+            __EQUIPMENT_INSERT__
             skipped_count := skipped_count + 1;
             CONTINUE;
         END IF;
@@ -92,13 +125,37 @@ BEGIN
         END LOOP;
         INSERT INTO recipe_meal_types(recipe_id, meal_type)
         SELECT rid, value FROM jsonb_array_elements_text(item->'mealTypes');
+        __PROFILE_INSERT__
+        __EQUIPMENT_INSERT__
         inserted_count := inserted_count + 1;
     END LOOP;
     RAISE NOTICE 'Catalogue: inserted %, skipped %', inserted_count, skipped_count;
 END $import$;
 __TRANSACTION_END__;
 """.replace("__PAYLOAD__", payload).replace("__TRANSACTION_END__", transaction_end)
-    result = subprocess.run(["docker", "exec", "-i", args.container, "psql", "-U", "smartmeal", "-d", "smartmeal",
+    profile_sql = """
+        IF item ? 'portionProfile' THEN
+            INSERT INTO recipe_portion_profiles(recipe_id,role,cooked_yield_g,yield_quality,source,min_g,max_g,step_g,contains_starch,contains_vegetables)
+            VALUES(rid,item->'portionProfile'->>'role',(item->'portionProfile'->>'cookedYieldG')::numeric,
+                   item->'portionProfile'->>'yieldQuality',item->'portionProfile'->>'source',
+                   (item->'portionProfile'->>'minG')::numeric,(item->'portionProfile'->>'maxG')::numeric,
+                   (item->'portionProfile'->>'stepG')::numeric,(item->'portionProfile'->>'containsStarch')::boolean,
+                   (item->'portionProfile'->>'containsVegetables')::boolean)
+            ON CONFLICT(recipe_id) DO NOTHING;
+        END IF;
+    """
+    sql = sql.replace("__PROFILE_INSERT__", profile_sql)
+    equipment_sql = """
+        FOR equipment_code IN SELECT value FROM jsonb_array_elements_text(coalesce(item->'equipmentCodes','[]'::jsonb)) LOOP
+            IF NOT EXISTS(SELECT 1 FROM equipment WHERE code=equipment_code) THEN
+                RAISE EXCEPTION 'Missing equipment code %', equipment_code;
+            END IF;
+            INSERT INTO recipe_equipment(recipe_id,equipment_id)
+            SELECT rid,id FROM equipment WHERE code=equipment_code ON CONFLICT DO NOTHING;
+        END LOOP;
+    """
+    sql=sql.replace("__EQUIPMENT_INSERT__",equipment_sql)
+    result = subprocess.run(["docker", "exec", "-i", args.container, "psql", "-U", "smartmeal", "-d", args.database,
                              "-v", "ON_ERROR_STOP=1"], input=sql, text=True, capture_output=True)
     if result.returncode:
         raise SystemExit(result.stderr)

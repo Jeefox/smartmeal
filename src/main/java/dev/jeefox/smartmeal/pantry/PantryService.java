@@ -32,6 +32,7 @@ public class PantryService {
     private final EntityManager em;
     private final ObjectMapper json;
     private final ZoneId zone;
+    @org.springframework.beans.factory.annotation.Autowired private CookedCoverage cooked;
 
     public PantryService(
             NamedParameterJdbcTemplate jdbc,
@@ -85,7 +86,7 @@ public class PantryService {
         var p = params(user);
         var lots =
                 jdbc.query(
-                        """
+"""
 select l.*,p.name,coalesce(r.amount,0) reserved from pantry_lots l join products p on p.id=l.product_id
 left join (select r.lot_id,sum(r.quantity_g) amount from pantry_reservations r
   join meal_plan_entries e on e.id=r.meal_plan_entry_id join meal_plans m on m.id=e.meal_plan_id
@@ -114,7 +115,7 @@ where l.user_id=:u and l.quantity_on_hand_g>0.000000000000000000000001 order by 
         Map<UUID, Lot> byId = new HashMap<>();
         lots.forEach(l -> byId.put(l.id(), l));
         jdbc.query(
-                """
+"""
 select r.lot_id,r.meal_plan_entry_id,r.quantity_g,m.plan_date,e.meal_type,e.recipe_snapshot->>'name' recipe_name
 from pantry_reservations r join meal_plan_entries e on e.id=r.meal_plan_entry_id
 join meal_plans m on m.id=e.meal_plan_id
@@ -136,7 +137,7 @@ order by m.plan_date,e.meal_type,e.position,e.id
                 });
         int pending =
                 jdbc.queryForObject(
-                        """
+"""
 select count(*) from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id
 where m.user_id=:u and m.status='CONFIRMED' and m.plan_date<:today and coalesce(s.state,'OPEN')='OPEN'
@@ -153,7 +154,7 @@ where m.user_id=:u and m.status='CONFIRMED' and m.plan_date<:today and coalesce(
         return stock(user, ownEntries);
     }
 
-    private Snapshot stock(UUID user, Set<UUID> ownEntries) {
+    Snapshot stock(UUID user, Set<UUID> ownEntries) {
         var p = params(user);
         String exclusion = "";
         if (!ownEntries.isEmpty()) {
@@ -162,7 +163,7 @@ where m.user_id=:u and m.status='CONFIRMED' and m.plan_date<:today and coalesce(
         }
         var lots =
                 jdbc.query(
-                        """
+"""
 select l.*,l.quantity_on_hand_g-coalesce(r.amount,0) available from pantry_lots l
 left join (select r.lot_id,sum(r.quantity_g) amount from pantry_reservations r
   join meal_plan_entries e on e.id=r.meal_plan_entry_id join meal_plans m on m.id=e.meal_plan_id
@@ -187,29 +188,36 @@ left join (select r.lot_id,sum(r.quantity_g) amount from pantry_reservations r
 
     private List<Demand> demands(UUID user) {
         em.flush();
-        return jdbc
-                .query(
-                        """
+        var raw =
+                jdbc
+                        .query(
+"""
 select e.id,e.recipe_snapshot,e.portions,e.meal_type,e.position,m.plan_date
 from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id
 where m.user_id=:u and m.status='CONFIRMED' and m.plan_date>=:today and coalesce(s.state,'OPEN')='OPEN'
 order by m.plan_date,e.meal_type,e.position,e.id
 """,
-                        params(user),
-                        (rs, n) ->
-                                calculate(
-                                        rs.getObject("id", UUID.class).toString(),
-                                        rs.getObject("plan_date", LocalDate.class),
-                                        mealOrder(rs.getString("meal_type")) * 100000
-                                                + rs.getInt("position"),
-                                        json.readValue(
-                                                rs.getString("recipe_snapshot"),
-                                                RecipeSnapshot.class),
-                                        rs.getBigDecimal("portions")))
-                .stream()
-                .flatMap(List::stream)
-                .toList();
+                                params(user),
+                                (rs, n) ->
+                                        calculate(
+                                                rs.getObject("id", UUID.class).toString(),
+                                                rs.getObject("plan_date", LocalDate.class),
+                                                mealOrder(rs.getString("meal_type")) * 100000
+                                                        + rs.getInt("position"),
+                                                json.readValue(
+                                                        rs.getString("recipe_snapshot"),
+                                                        RecipeSnapshot.class),
+                                                rs.getBigDecimal("portions")))
+                        .stream()
+                        .flatMap(List::stream)
+                        .toList();
+        return cooked.adjust(user, raw, today());
+    }
+
+    public List<Demand> cookingDemand(
+            String email, List<Demand> raw, LocalDate from, LocalDate to) {
+        return cooked.forPeriod(lockOwner(email), raw, today(), from, to);
     }
 
     private int mealOrder(String meal) {
@@ -229,7 +237,7 @@ order by m.plan_date,e.meal_type,e.position,e.id
     private void rebuild(UUID user) {
         em.flush();
         jdbc.update(
-                """
+"""
 insert into meal_entry_inventory_states(meal_plan_entry_id,state,updated_at)
 select e.id,'OPEN',now() from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 where m.user_id=:u and m.status='CONFIRMED' and m.plan_date>=:today on conflict do nothing
@@ -272,7 +280,7 @@ where m.user_id=:u and m.status='CONFIRMED' and m.plan_date>=:today on conflict 
         jdbc.update("delete from pantry_reservations where user_id=:u", params(user));
         for (var a : allocation.allocations())
             jdbc.update(
-                    """
+"""
 insert into pantry_reservations(user_id,lot_id,meal_plan_entry_id,quantity_g) values(:u,:l,:e,:q)
 """,
                     Map.of(
@@ -302,9 +310,9 @@ insert into pantry_reservations(user_id,lot_id,meal_plan_entry_id,quantity_g) va
         }
     }
 
-    private record Work(UUID user, UUID operation) {}
+    record Work(UUID user, UUID operation) {}
 
-    private Action execute(
+    Action execute(
             String email,
             UUID key,
             String kind,
@@ -336,7 +344,7 @@ insert into pantry_reservations(user_id,lot_id,meal_plan_entry_id,quantity_g) va
         p.put("kind", kind);
         p.put("payload", serialized);
         jdbc.update(
-                """
+"""
 insert into pantry_operations(id,user_id,idempotency_key,request_hash,kind,request_payload,result_payload,created_at)
 values(:op,:u,:key,:hash,:kind,cast(:payload as jsonb),'{}'::jsonb,now())
 """,
@@ -388,7 +396,7 @@ values(:op,:u,:key,:hash,:kind,cast(:payload as jsonb),'{}'::jsonb,now())
         p.put("source", source);
         p.put("sku", line.storeProductId());
         jdbc.update(
-                """
+"""
 insert into pantry_lots(id,user_id,product_id,quantity_on_hand_g,received_on,expires_on,source,store_product_id,created_at,updated_at)
 values(:id,:u,:p,0,:received,:expiry,:source,:sku,now(),now())
 """,
@@ -437,8 +445,7 @@ values(:id,:u,:p,0,:received,:expiry,:source,:sku,now(),now())
         return rows.getFirst();
     }
 
-    private void move(
-            Work work, UUID lot, BigDecimal delta, String reason, UUID entry, UUID reversal) {
+    void move(Work work, UUID lot, BigDecimal delta, String reason, UUID entry, UUID reversal) {
         if (delta.signum() == 0) return;
         var p = params(work.user());
         p.put("l", lot);
@@ -450,7 +457,7 @@ values(:id,:u,:p,0,:received,:expiry,:source,:sku,now(),now())
         p.put("reversal", reversal);
         int changed =
                 jdbc.update(
-                        """
+"""
 update pantry_lots set quantity_on_hand_g=quantity_on_hand_g+:q,updated_at=now()
 where user_id=:u and id=:l and quantity_on_hand_g+:q>=0
 """,
@@ -458,7 +465,7 @@ where user_id=:u and id=:l and quantity_on_hand_g+:q>=0
         if (changed != 1)
             throw PantryException.conflict("INSUFFICIENT_STOCK", "Недостаточно продукта в партии");
         jdbc.update(
-                """
+"""
 insert into pantry_movements(id,user_id,operation_id,lot_id,quantity_delta_g,reason,meal_plan_entry_id,reversal_of_id,created_at)
 values(:id,:u,:op,:l,:q,:reason,:e,:reversal,now())
 """,
@@ -516,7 +523,7 @@ values(:id,:u,:op,:l,:q,:reason,:e,:reversal,now())
         p.put("plan", planId);
         var states =
                 jdbc.query(
-                        """
+"""
 select e.id,coalesce(s.state,'OPEN') state from meal_plan_entries e
 left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id where e.meal_plan_id=:plan order by e.position,e.id
 """,
@@ -529,7 +536,7 @@ left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id where e.mea
         for (var s : states) {
             p.put("entry", s.entryId());
             jdbc.query(
-                    """
+"""
 select l.product_id,sum(r.quantity_g) q from pantry_reservations r join pantry_lots l on l.id=r.lot_id
 join meal_plan_entries e on e.id=r.meal_plan_entry_id join meal_plans m on m.id=e.meal_plan_id
 where r.user_id=:u and r.meal_plan_entry_id=:entry and m.plan_date>=:today group by l.product_id
@@ -554,7 +561,7 @@ where r.user_id=:u and r.meal_plan_entry_id=:entry and m.plan_date>=:today group
     private Map<String, Object> ownedEntry(UUID user, UUID entry) {
         var rows =
                 jdbc.queryForList(
-                        """
+"""
 select e.*,m.status plan_status,m.plan_date,coalesce(s.state,'OPEN') inventory_state,s.deduction_operation_id
 from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id where e.id=:id and m.user_id=:u
@@ -570,7 +577,7 @@ left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id where e.id=
         p.put("state", state);
         p.put("op", operation);
         jdbc.update(
-                """
+"""
 insert into meal_entry_inventory_states(meal_plan_entry_id,state,deduction_operation_id,updated_at)
 values(:e,:state,:op,now()) on conflict(meal_plan_entry_id) do update
 set state=:state,deduction_operation_id=:op,updated_at=now()
@@ -600,6 +607,7 @@ set state=:state,deduction_operation_id=:op,updated_at=now()
                     var recipe =
                             json.readValue(
                                     e.get("recipe_snapshot").toString(), RecipeSnapshot.class);
+                    cooked.requireReady(w.user(), entry, today());
                     // Actual preparation uses today's available lots, not expired historical
                     // reservations.
                     var demand =
@@ -609,6 +617,7 @@ set state=:state,deduction_operation_id=:op,updated_at=now()
                                     0,
                                     recipe,
                                     (BigDecimal) e.get("portions"));
+                    demand = cooked.adjust(w.user(), demand, today());
                     var result =
                             PantryAllocationCalculator.allocate(
                                     demand, stock(w.user(), Set.of(entry)));
@@ -660,6 +669,7 @@ set state=:state,deduction_operation_id=:op,updated_at=now()
                     if (!"DEDUCTED".equals(e.get("inventory_state")))
                         throw PantryException.conflict(
                                 "ENTRY_STATE_CONFLICT", "У блюда нет действующего списания");
+                    cooked.requireNotConsumed(w.user(), entry);
                     var rows =
                             jdbc.queryForList(
                                     "select * from pantry_movements where user_id=:u and"
@@ -703,6 +713,7 @@ set state=:state,deduction_operation_id=:op,updated_at=now()
                         throw PantryException.conflict(
                                 "ENTRY_STATE_CONFLICT",
                                 "Сначала отмените списание или подтвердите меню");
+                    if (r.state() == State.SKIPPED) cooked.release(w.user(), List.of(entry));
                     setState(entry, r.state().name(), null);
                     return List.of();
                 });
@@ -725,7 +736,7 @@ set state=:state,deduction_operation_id=:op,updated_at=now()
                                     "Можно восстановить только отменённый день");
                         int movements =
                                 jdbc.queryForObject(
-                                        """
+"""
 select count(*) from pantry_movements v join meal_plan_entries e on e.id=v.meal_plan_entry_id
 where e.meal_plan_id=:p
 """,
@@ -738,13 +749,36 @@ where e.meal_plan_id=:p
                                             + " восстановлением черновика.");
                     } else if (old.equals("CANCELLED"))
                         throw PantryException.conflict("PLAN_STATE_CONFLICT", "День уже отменён");
+                    var cookingEntries =
+                            jdbc.queryForList(
+                                    "select id from meal_plan_entries where meal_plan_id=:p",
+                                    Map.of("p", plan),
+                                    UUID.class);
+                    if (reopen && !cookingEntries.isEmpty()) {
+                        int history =
+                                jdbc.queryForObject(
+                                        "select count(*) from cooking_allocations a join"
+                                                + " cooking_batches b on b.id=a.batch_id where"
+                                                + " a.entry_id in(:ids) and b.status<>'CANCELLED'",
+                                        Map.of("ids", cookingEntries),
+                                        Integer.class);
+                        if (history > 0)
+                            throw PantryException.conflict(
+                                    "PLAN_HAS_HISTORY",
+                                    "У дня есть история приготовленных партий; её нельзя переписать"
+                                            + " восстановлением черновика");
+                        jdbc.update(
+                                "delete from cooking_allocations where entry_id in(:ids)",
+                                Map.of("ids", cookingEntries));
+                    }
+                    if (!reopen) cooked.release(w.user(), cookingEntries);
                     var p = params(w.user());
                     p.put("id", plan);
                     p.put("status", reopen ? "DRAFT" : "CANCELLED");
                     p.put("old", old);
                     p.put("op", w.operation());
                     jdbc.update(
-                            """
+"""
 update meal_plans set status=:status,cancelled_at=case when :status='CANCELLED' then now() else null end,
 daily_calorie_target_snapshot=case when :status='DRAFT' then null else daily_calorie_target_snapshot end,
 confirmed_at=case when :status='DRAFT' then null else confirmed_at end,updated_at=now(),
@@ -789,7 +823,7 @@ where id=:id and user_id=:u
             op.movements()
                     .addAll(
                             jdbc.query(
-                                    """
+"""
 select m.*,l.product_id,p.name from pantry_movements m join pantry_lots l on l.id=m.lot_id join products p on p.id=l.product_id
 where m.user_id=:u and m.operation_id=:op order by p.name,m.id
 """,
@@ -810,7 +844,7 @@ where m.user_id=:u and m.operation_id=:op order by p.name,m.id
         UUID user = lockOwner(email);
         return new HashSet<>(
                 jdbc.queryForList(
-                        """
+"""
 select e.id from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id
 where m.user_id=:u and e.id in (:ids) and s.state='DEDUCTED'
@@ -825,7 +859,7 @@ where m.user_id=:u and e.id in (:ids) and s.state='DEDUCTED'
         rebuild(user);
         return new HashSet<>(
                 jdbc.queryForList(
-                        """
+"""
 select e.id from meal_plan_entries e join meal_plans m on m.id=e.meal_plan_id
 left join meal_entry_inventory_states s on s.meal_plan_entry_id=e.id
 where m.user_id=:u and e.id in (:ids) and (m.status='CANCELLED' or coalesce(s.state,'OPEN')<>'OPEN')

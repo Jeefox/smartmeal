@@ -36,8 +36,11 @@ public class PeriodPlanningController {
 
     @GetMapping("/{id}/entries/{entryId}/alternatives")
     public List<Alternative> alternatives(
-            Authentication auth, @PathVariable UUID id, @PathVariable String entryId) {
-        return service.alternatives(auth.getName(), id, entryId);
+            Authentication auth,
+            @PathVariable UUID id,
+            @PathVariable String entryId,
+            @RequestParam(required = false) String componentId) {
+        return service.alternatives(auth.getName(), id, entryId, componentId);
     }
 
     @PutMapping("/{id}/entries/{entryId}")
@@ -56,6 +59,16 @@ public class PeriodPlanningController {
             @PathVariable String entryId,
             @Valid @RequestBody Lock request) {
         return service.lock(auth.getName(), id, entryId, request);
+    }
+
+    @PatchMapping("/{id}/entries/{entryId}/components/{componentId}/lock")
+    public View lockComponent(
+            Authentication auth,
+            @PathVariable UUID id,
+            @PathVariable String entryId,
+            @PathVariable String componentId,
+            @Valid @RequestBody Lock r) {
+        return service.lockComponent(auth.getName(), id, entryId, componentId, r);
     }
 
     @PostMapping("/{id}/refresh")

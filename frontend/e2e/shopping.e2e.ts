@@ -71,7 +71,7 @@ test('показывает граммы и предупреждение, не д
 test('пустой период — успешная выдача, а не ошибка', async ({ page }) => {
   const state = await fixture(page);
   state.empty = true;
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await expect(page.getByRole('heading', { name: 'На этот период нет продуктов' })).toBeVisible();
   await expect(page.locator('.error-state')).toHaveCount(0);
   await expect(page.getByText('В периоде есть черновые меню.', { exact: false })).toHaveCount(0);
@@ -118,7 +118,7 @@ test('период применяется явно и переживает пе�
 test('400/сеть не превращаются в пустоту, 401 требует входа', async ({ page }) => {
   const state = await fixture(page);
   state.status = 400;
-  await page.goto('/shopping');
+  await page.goto('/shopping?view=calendar');
   await expect(page.locator('.error-state')).toContainText('Период отклонён сервером');
   await expect(page.getByRole('heading', { name: 'На этот период нет продуктов' })).toHaveCount(0);
   state.status = 200;

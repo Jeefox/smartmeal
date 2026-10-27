@@ -149,4 +149,54 @@ class PantryAllocationCalculatorTest {
         assertFalse(result.unknownExpiry());
         assertEquals(g("100"), result.shortageG().get(1L));
     }
+
+    @org.junit.jupiter.api.Test
+    void
+            confirmedFutureReservationsStayProtectedWhenFutureReceivedStockCannotCoverAnEarlierDraft() {
+        var day = java.time.LocalDate.of(2035, 1, 1);
+        var first =
+                new PantryModels.StockLot(
+                        java.util.UUID.randomUUID(),
+                        1L,
+                        new java.math.BigDecimal("100"),
+                        day,
+                        day.plusDays(1),
+                        java.time.Instant.EPOCH);
+        var second =
+                new PantryModels.StockLot(
+                        java.util.UUID.randomUUID(),
+                        1L,
+                        new java.math.BigDecimal("100"),
+                        day.plusDays(1),
+                        day.plusDays(10),
+                        java.time.Instant.EPOCH);
+        var stock = new PantryModels.Snapshot(0, day, java.util.List.of(first, second));
+        var demands =
+                java.util.List.of(
+                        new IngredientDemandCalculator.Demand(
+                                "draft", 1L, "Рис", day, 0, new java.math.BigDecimal("100")),
+                        new IngredientDemandCalculator.Demand(
+                                "confirmed",
+                                1L,
+                                "Рис",
+                                day.plusDays(1),
+                                0,
+                                new java.math.BigDecimal("100")));
+        var protectedResult =
+                PantryAllocationCalculator.allocatePrioritized(
+                        demands, stock, java.util.Set.of("confirmed"));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                0, new java.math.BigDecimal("100").compareTo(protectedResult.coveredG().get(1L)));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "confirmed", protectedResult.allocations().getFirst().entryId());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                first.id(), protectedResult.allocations().getFirst().lotId());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                0,
+                new java.math.BigDecimal("200")
+                        .compareTo(
+                                PantryAllocationCalculator.allocate(demands, stock)
+                                        .coveredG()
+                                        .get(1L)));
+    }
 }

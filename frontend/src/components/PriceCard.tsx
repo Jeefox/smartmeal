@@ -62,6 +62,7 @@ export default function PriceCard({ sku }: { sku: StoreProduct }) {
       setBusy(false);
     }
   }
+  const canEdit = useSession().profile?.canEditCatalogue;
   return (
     <section className="sku-price-card" aria-label="Цена выбранной упаковки">
       <div className="section-heading">
@@ -128,75 +129,79 @@ export default function PriceCard({ sku }: { sku: StoreProduct }) {
           определяется по дате наблюдения.
         </div>
       )}
-      <form className="sku-price-form" onSubmit={submit} noValidate>
-        <h3>Добавить наблюдение цены</h3>
-        <label>
-          <span>Цена упаковки, ₽</span>
-          <input
-            aria-label="Цена упаковки, ₽"
-            aria-describedby={errors.price ? 'sku-price-error' : undefined}
-            inputMode="decimal"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            disabled={busy}
-            aria-invalid={Boolean(errors.price)}
-          />
-          {errors.price && (
-            <span id="sku-price-error" className="field-error" role="alert">
-              {errors.price}
-            </span>
-          )}
-        </label>
-        <label>
-          <span>Когда наблюдали цену</span>
-          <input
-            aria-label="Когда наблюдали цену"
-            aria-describedby={errors.observedAt ? 'sku-date-error' : undefined}
-            type="datetime-local"
-            value={at}
-            onChange={(e) => setAt(e.target.value)}
-            disabled={busy}
-            aria-invalid={Boolean(errors.observedAt)}
-          />
-          {errors.observedAt && (
-            <span id="sku-date-error" className="field-error" role="alert">
-              {errors.observedAt}
-            </span>
-          )}
-        </label>
-        <p className="caption">
-          Часовой пояс устройства: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Дата и время
-          будут отправлены в UTC. Будущее время недопустимо.
-        </p>
-        <label className="sku-checkbox">
-          <input
-            type="checkbox"
-            checked={promo}
-            onChange={(e) => setPromo(e.target.checked)}
-            disabled={busy}
-          />
-          Акционная цена
-        </label>
-        {promo && <Notice>Акционная запись не заменяет неакционную цену в оценках покупок.</Notice>}
-        {error && (
-          <div className="estimate-error" role="alert">
-            <p>{error.message}</p>
-            {error instanceof ApiError && error.status === 0 && (
-              <p>
-                Сервер не подтвердил запись. Перед повторной отправкой обновите цену: наблюдение
-                могло сохраниться.
-              </p>
+      {canEdit && (
+        <form className="sku-price-form" onSubmit={submit} noValidate>
+          <h3>Добавить наблюдение цены</h3>
+          <label>
+            <span>Цена упаковки, ₽</span>
+            <input
+              aria-label="Цена упаковки, ₽"
+              aria-describedby={errors.price ? 'sku-price-error' : undefined}
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              disabled={busy}
+              aria-invalid={Boolean(errors.price)}
+            />
+            {errors.price && (
+              <span id="sku-price-error" className="field-error" role="alert">
+                {errors.price}
+              </span>
             )}
-          </div>
-        )}
-        <button
-          className="button primary"
-          type="submit"
-          disabled={!online || busy || !price.trim()}
-        >
-          {busy ? 'Сохраняем…' : 'Сохранить наблюдение'}
-        </button>
-      </form>
+          </label>
+          <label>
+            <span>Когда наблюдали цену</span>
+            <input
+              aria-label="Когда наблюдали цену"
+              aria-describedby={errors.observedAt ? 'sku-date-error' : undefined}
+              type="datetime-local"
+              value={at}
+              onChange={(e) => setAt(e.target.value)}
+              disabled={busy}
+              aria-invalid={Boolean(errors.observedAt)}
+            />
+            {errors.observedAt && (
+              <span id="sku-date-error" className="field-error" role="alert">
+                {errors.observedAt}
+              </span>
+            )}
+          </label>
+          <p className="caption">
+            Часовой пояс устройства: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Дата и
+            время будут отправлены в UTC. Будущее время недопустимо.
+          </p>
+          <label className="sku-checkbox">
+            <input
+              type="checkbox"
+              checked={promo}
+              onChange={(e) => setPromo(e.target.checked)}
+              disabled={busy}
+            />
+            Акционная цена
+          </label>
+          {promo && (
+            <Notice>Акционная запись не заменяет неакционную цену в оценках покупок.</Notice>
+          )}
+          {error && (
+            <div className="estimate-error" role="alert">
+              <p>{error.message}</p>
+              {error instanceof ApiError && error.status === 0 && (
+                <p>
+                  Сервер не подтвердил запись. Перед повторной отправкой обновите цену: наблюдение
+                  могло сохраниться.
+                </p>
+              )}
+            </div>
+          )}
+          <button
+            className="button primary"
+            type="submit"
+            disabled={!online || busy || !price.trim()}
+          >
+            {busy ? 'Сохраняем…' : 'Сохранить наблюдение'}
+          </button>
+        </form>
+      )}
     </section>
   );
 }

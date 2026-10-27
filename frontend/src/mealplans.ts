@@ -13,6 +13,7 @@ export const mealLabels: Record<ApiMealType, string> = {
   SNACK: 'Перекус',
 };
 export type RecipeSnapshot = {
+  components?: import('./balanced-meals').MealComponent[];
   recipeId: string;
   name: string;
   description: string | null;
@@ -58,7 +59,10 @@ export const mealPlanApi = {
     }
   },
   create: (planDate: string) =>
-    request<MealPlan>('/me/meal-plans', { method: 'POST', body: JSON.stringify({ planDate }) }),
+    request<MealPlan>('/me/meal-plans', {
+      method: 'POST',
+      body: JSON.stringify({ planDate }),
+    }),
   add: (planId: string, recipeId: string, mealType: ApiMealType, portions: number) =>
     request<MealPlanEntry>(`/me/meal-plans/${encodeURIComponent(planId)}/entries`, {
       method: 'POST',
@@ -75,7 +79,9 @@ export const mealPlanApi = {
       { method: 'DELETE' },
     ),
   confirm: (planId: string) =>
-    request<MealPlan>(`/me/meal-plans/${encodeURIComponent(planId)}/confirm`, { method: 'POST' }),
+    request<MealPlan>(`/me/meal-plans/${encodeURIComponent(planId)}/confirm`, {
+      method: 'POST',
+    }),
 };
 export function validPortions(value: string) {
   return /^\d{1,4}(\.\d{1,2})?$/.test(value) && Number(value) > 0 && Number(value) <= 9999.99;
@@ -98,7 +104,10 @@ export function useRefreshPlan() {
   const userId = useSession().profile!.userId;
   return async (date: string) => {
     await invalidateShopping(client, userId);
-    await client.invalidateQueries({ queryKey: mealPlanKey(userId, date), refetchType: 'none' });
+    await client.invalidateQueries({
+      queryKey: mealPlanKey(userId, date),
+      refetchType: 'none',
+    });
     return client.fetchQuery({
       queryKey: mealPlanKey(userId, date),
       queryFn: ({ signal }) => mealPlanApi.find(date, signal),
@@ -130,7 +139,15 @@ export async function addRecipeToDay(
   return mealPlanApi.add(plan.id, recipeId, meal, portions);
 }
 export const planRecipes = (q: string, page: number, signal?: AbortSignal) =>
-  api.recipes(new URLSearchParams({ q, page: String(page), size: '12', sort: 'name,asc' }), signal);
+  api.recipes(
+    new URLSearchParams({
+      q,
+      page: String(page),
+      size: '12',
+      sort: 'name,asc',
+    }),
+    signal,
+  );
 // Re-export the shopping contract for existing clients.
 export { readShoppingNeeds } from './shopping';
 export type { ShoppingNeeds } from './shopping';

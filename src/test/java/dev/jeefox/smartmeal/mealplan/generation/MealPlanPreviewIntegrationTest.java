@@ -372,7 +372,7 @@ class MealPlanPreviewIntegrationTest {
                         new PreviewMealPlanRequest(
                                 date, null, null, null, storeId, new BigDecimal("100.00")));
         var item = result.budgetEstimate().shoppingEstimate().items().getFirst();
-        assertEquals("Банан", item.productName());
+        assertEquals("Бананы", item.productName());
         assertEquals(new BigDecimal("4000.000000000000000000000000000000"), item.requiredWeightG());
         assertEquals(2, item.packageCount());
         assertEquals(new BigDecimal("80.00"), item.purchaseCost());

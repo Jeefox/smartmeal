@@ -1,3 +1,7 @@
+import SavedMealReplacement from '../components/SavedMealReplacement';
+import TodayCooking from '../components/TodayCooking';
+import TodayPortions from '../components/TodayPortions';
+import MealComposition, { FiberLabel } from '../components/MealComposition';
 import { useEffect, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import {
@@ -103,7 +107,9 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
     !Number.isNaN(Date.parse(dateParam + 'T12:00:00Z')) &&
     new Date(dateParam + 'T12:00:00Z').toISOString().slice(0, 10) === dateParam
       ? dateParam
-      : stateDate;
+      : week
+        ? stateDate
+        : dateKey(new Date());
   useEffect(() => {
     if (selectedDate !== stateDate) setSelectedDate(selectedDate);
   }, [selectedDate, stateDate, setSelectedDate]);
@@ -175,21 +181,18 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
     setRemove(null);
   }
   return (
-    <>
+    <div className={week ? 'week-planner' : 'today-screen'}>
       <PageHeading
-        eyebrow="ВАШ ПЛАН НА СЕРВЕРЕ"
-        title={week ? 'Меню недели' : 'Хороший день начинается с плана'}
+        eyebrow={week ? 'МЕНЮ НЕДЕЛИ' : undefined}
+        title={
+          week ? 'Меню недели' : selectedDate === dateKey(new Date()) ? 'Сегодня' : 'Меню на день'
+        }
         description={
-          week
-            ? 'Выберите день недели. Каждый день хранится и подтверждается отдельно.'
-            : 'Соберите меню вручную или начните с серверного предпросмотра дня.'
+          week ? 'Выберите день недели. Каждый день хранится и подтверждается отдельно.' : undefined
         }
         actions={
           <div className="preview-planner-actions">
-            <Link className="button secondary" to={`/menu-generation?from=${selectedDate}`}>
-              Подобрать неделю
-            </Link>
-            <Link className="button primary" to={`/menu-preview?date=${selectedDate}`}>
+            <Link className="button primary" to={`/menu-generation?from=${selectedDate}`}>
               Подобрать меню
             </Link>
             <div className="segmented">
@@ -203,7 +206,6 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
           </div>
         }
       />
-      {plan && <PlanInventory key={plan.id} plan={plan} />}
       <div className="planner-toolbar">
         <div className="date-controls">
           <button
@@ -234,13 +236,15 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
           >
             <ChevronRight size={19} />
           </button>
-          <button
-            className="button quiet"
-            disabled={busy}
-            onClick={() => selectDate(dateKey(new Date()))}
-          >
-            Сегодня
-          </button>
+          {(week || selectedDate !== dateKey(new Date())) && (
+            <button
+              className="button quiet"
+              disabled={busy}
+              onClick={() => selectDate(dateKey(new Date()))}
+            >
+              Сегодня
+            </button>
+          )}
         </div>
         <button
           className="button"
@@ -251,7 +255,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
           }}
         >
           <RefreshCw size={16} />
-          Обновить
+          <span className={week ? undefined : 'sr-only'}>Обновить</span>
         </button>
       </div>
       {week && (
@@ -317,18 +321,16 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
               повторять сохранение автоматически не будем.
             </Notice>
           )}
-          {plan.status === 'CONFIRMED' && (
-            <Notice tone="success">
-              Меню подтверждено
-              {plan.confirmedAt ? ` · ${new Date(plan.confirmedAt).toLocaleString('ru-RU')}` : ''}.
-              Рецепты и цель зафиксированы; редактирование недоступно.
-            </Notice>
-          )}
+          {plan.status === 'CONFIRMED' && <p className="caption">Меню подтверждено</p>}
           <section className="daily-overview">
-            <div className="daily-main">
+            <div className={`daily-main ${plan.status === 'CONFIRMED' ? 'today-confirmed' : ''}`}>
               <div className="overview-top">
                 <span className="eyebrow">
-                  {labelDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {labelDate(selectedDate, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
                 </span>
                 <span className="draft-badge">
                   {plan.status === 'CANCELLED'
@@ -341,6 +343,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
               <div className="energy-row">
                 <div>
                   <h2>
+                    {!week && <span>{family ? 'По меню на всех ' : 'По меню '}</span>}
                     {number(calories!)}
                     <span>{target ? ` / ${number(target)} ккал` : ' ккал · цель не задана'}</span>
                   </h2>
@@ -358,20 +361,35 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                   <b>{progress == null ? '—' : `${number(progress)}%`}</b>
                 </div>
               </div>
-              <NutritionValues
-                nutrition={plan.nutritionTotal}
-                label="КБЖУ меню дня · значения получены от сервера"
-              />
-              {family && (
-                <div className="household-day" aria-label="Питание каждого">
-                  {plan.people?.map((p) => (
-                    <p key={p.participantId}>
-                      <strong>{p.name}</strong>: {number(p.nutrition.calories)} /{' '}
-                      {number(p.dailyCalorieTarget)} ккал
-                    </p>
-                  ))}
-                </div>
-              )}
+              <details className="today-nutrition">
+                <summary>Питание за день: калории, белок и клетчатка</summary>
+                <NutritionValues
+                  nutrition={plan.nutritionTotal}
+                  label="КБЖУ меню дня · значения получены от сервера"
+                />
+                {(family || plan.entries.some((e) => e.recipeSnapshot.components?.length)) && (
+                  <div className="household-day" aria-label="Питание каждого">
+                    {plan.people?.map((p) => (
+                      <p key={p.participantId}>
+                        <strong>{p.name}</strong>: {number(p.nutrition.calories)} /{' '}
+                        {number(p.dailyCalorieTarget)} ккал
+                        {plan.entries.some((e) => e.recipeSnapshot.components?.length) && (
+                          <>
+                            {' · белок '}
+                            {number(p.nutrition.protein)}
+                            {p.proteinTargetG ? ` / ${number(p.proteinTargetG)}` : ''} г{' · '}
+                            <FiberLabel
+                              known={p.nutrition.knownFiber}
+                              complete={p.nutrition.fiberComplete}
+                            />
+                            {p.fiberTargetG ? ` / цель ${number(p.fiberTargetG)} г` : ''}
+                          </>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </details>
               <p className="caption">
                 {family
                   ? 'Нормы и состав семьи сохранены вместе с этим меню.'
@@ -385,7 +403,7 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
                 </Link>
               )}
             </div>
-            <aside className="budget-overview">
+            <aside className="budget-overview today-shopping-summary">
               <span className="eyebrow">ПОКУПКИ И БЮДЖЕТ</span>
               <ShoppingBasket size={27} />
               <h2 className="live-budget-title">Продукты по меню</h2>
@@ -400,6 +418,9 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
               </Link>
             </aside>
           </section>
+          {!week && plan.status !== 'CANCELLED' && (
+            <TodayCooking key={`${userId}:${selectedDate}`} date={selectedDate} />
+          )}
           <div className="section-title">
             <div>
               <h2>
@@ -426,108 +447,143 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
             </p>
           )}
           <div className="meal-list">
-            {mealTypes.map((type, index) => (
-              <section className="meal-slot" key={type}>
-                <div className="meal-slot-heading">
-                  <div>
-                    <span className="meal-symbol">{['☀', '◐', '☾', '✳'][index]}</span>
-                    <h3>{mealLabels[type]}</h3>
-                  </div>
-                  {!confirmed && !family && (
-                    <button
-                      className="icon-button"
-                      disabled={busy || !online || query.isError}
-                      aria-label={`Добавить: ${mealLabels[type]}`}
-                      onClick={() => setAdd(type)}
-                    >
-                      <Plus size={19} />
-                    </button>
-                  )}
-                </div>
-                {plan.entries
-                  .filter((entry) => entry.mealType === type)
-                  .sort((a, b) => a.position - b.position)
-                  .map((entry) => (
-                    <article className="meal-card live-meal-card" key={entry.id}>
+            {mealTypes
+              .filter(
+                (type) =>
+                  type !== 'SNACK' || !confirmed || plan.entries.some((e) => e.mealType === type),
+              )
+              .map((type, index) => (
+                <section className="meal-slot" key={type}>
+                  <div className="meal-slot-heading">
+                    <div>
+                      <span className="meal-symbol">{['☀', '◐', '☾', '✳'][index]}</span>
+                      <h3>{mealLabels[type]}</h3>
+                    </div>
+                    {!confirmed && !family && (
                       <button
-                        className="meal-photo"
-                        aria-label={`Снимок блюда: ${entry.recipeSnapshot.name}`}
-                        onClick={() => setDetail(entry)}
+                        className="icon-button"
+                        disabled={busy || !online || query.isError}
+                        aria-label={`Добавить: ${mealLabels[type]}`}
+                        onClick={() => setAdd(type)}
                       >
-                        <RecipeImage recipe={snapshotRecipe(entry.recipeSnapshot)} />
+                        <Plus size={19} />
                       </button>
-                      <div className="meal-info">
-                        <button className="snapshot-title" onClick={() => setDetail(entry)}>
-                          <h3>{entry.recipeSnapshot.name}</h3>
-                        </button>
-                        <p>
-                          {entry.recipeSnapshot.preparationTimeMin} мин ·{' '}
-                          {number(entry.nutrition.calories)} ккал · {entry.portions} порц.
-                        </p>
-                        {family && (
-                          <ul className="household-portions" aria-label="Порции по людям">
-                            {entry.personPortions?.map((p) => (
-                              <li key={p.participantId}>
-                                <strong>{p.name}</strong>: {number(p.portions, 2)} порц. ·{' '}
-                                {number(p.nutrition.calories)} ккал
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {confirmed ? (
-                          <>
-                            <span className="caption">Порции зафиксированы</span>
-                            <PlanInventory plan={plan} entry={entry} />
-                          </>
-                        ) : (
-                          <PortionEditor
-                            key={`${entry.id}-${entry.portions}`}
-                            entry={entry}
-                            busy={busy || !online || query.isError}
-                            onSave={(value) =>
-                              mutate(
-                                () => mealPlanApi.portions(plan.id, entry.id, value),
-                                'Порции сохранены. Итоги обновлены.',
-                              )
-                            }
-                          />
-                        )}
-                      </div>
-                      {!confirmed && (
+                    )}
+                  </div>
+                  {plan.entries
+                    .filter((entry) => entry.mealType === type)
+                    .sort((a, b) => a.position - b.position)
+                    .map((entry) => (
+                      <article className="meal-card live-meal-card" key={entry.id}>
                         <button
-                          className="icon-button danger"
-                          disabled={busy || !online || query.isError}
-                          aria-label={`Удалить: ${entry.recipeSnapshot.name}`}
-                          onClick={() => setRemove(entry)}
+                          className="meal-photo"
+                          aria-label={`Снимок блюда: ${entry.recipeSnapshot.name}`}
+                          onClick={() => setDetail(entry)}
                         >
-                          <Trash2 size={18} />
+                          <RecipeImage recipe={snapshotRecipe(entry.recipeSnapshot)} />
                         </button>
-                      )}
-                    </article>
-                  ))}
-                {!plan.entries.some((entry) => entry.mealType === type) &&
-                  (!confirmed && !family ? (
-                    <button
-                      className="empty-meal"
-                      disabled={busy || !online || query.isError}
-                      onClick={() => setAdd(type)}
-                    >
-                      <Plus size={17} />
-                      Добавить блюдо
-                    </button>
-                  ) : (
-                    <p className="caption">Нет блюд</p>
-                  ))}
-              </section>
-            ))}
+                        <div className="meal-info">
+                          <button className="snapshot-title" onClick={() => setDetail(entry)}>
+                            <h3>{entry.recipeSnapshot.name}</h3>
+                          </button>
+                          <p>
+                            {entry.recipeSnapshot.preparationTimeMin} мин ·{' '}
+                            {number(entry.nutrition.calories)} ккал
+                            {entry.recipeSnapshot.components?.length
+                              ? ' · составной приём пищи'
+                              : ` · ${entry.portions} порц.`}
+                          </p>
+                          {family && !entry.recipeSnapshot.components?.length && (
+                            <ul className="household-portions" aria-label="Порции по людям">
+                              {entry.personPortions?.map((p) => (
+                                <li key={p.participantId}>
+                                  <strong>{p.name}</strong>: {number(p.portions, 2)} порц. ·{' '}
+                                  {number(p.nutrition.calories)} ккал
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {!week && (
+                            <TodayPortions
+                              entry={entry}
+                              date={selectedDate}
+                              confirmed={plan.status === 'CONFIRMED'}
+                            />
+                          )}
+                          {!!entry.recipeSnapshot.components?.length && (
+                            <details className="today-recipe-details">
+                              <summary>Рецепт и подробности количества</summary>
+                              <MealComposition
+                                recipe={entry.recipeSnapshot}
+                                people={entry.personPortions || []}
+                              />
+                            </details>
+                          )}
+                          <SavedMealReplacement plan={plan} entry={entry} />
+                          {confirmed ? (
+                            <>
+                              <PlanInventory plan={plan} entry={entry} />
+                            </>
+                          ) : entry.recipeSnapshot.components?.length ? (
+                            <span className="caption">
+                              Индивидуальные количества заданы подбором
+                            </span>
+                          ) : (
+                            <PortionEditor
+                              key={`${entry.id}-${entry.portions}`}
+                              entry={entry}
+                              busy={busy || !online || query.isError}
+                              onSave={(value) =>
+                                mutate(
+                                  () => mealPlanApi.portions(plan.id, entry.id, value),
+                                  'Порции сохранены. Итоги обновлены.',
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                        {!confirmed && (
+                          <button
+                            className="icon-button danger"
+                            disabled={busy || !online || query.isError}
+                            aria-label={`Удалить: ${entry.recipeSnapshot.name}`}
+                            onClick={() => setRemove(entry)}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </article>
+                    ))}
+                  {!plan.entries.some((entry) => entry.mealType === type) &&
+                    (!confirmed && !family ? (
+                      <button
+                        className="empty-meal"
+                        disabled={busy || !online || query.isError}
+                        onClick={() => setAdd(type)}
+                      >
+                        <Plus size={17} />
+                        Добавить блюдо
+                      </button>
+                    ) : (
+                      <p className="caption">Нет блюд</p>
+                    ))}
+                </section>
+              ))}
           </div>
-          <Notice>
-            Предпросмотр подбирает новый день и сохраняет его отдельным черновиком. Замены и
-            закрепление отдельных блюд пока не поддерживаются API. Подтверждение фиксирует день, но
-            не означает соблюдение бюджета.
-          </Notice>
+          <details>
+            <summary>О меню и расчёте</summary>
+            <p>
+              Здесь показано запланированное питание. Приготовление и употребление готовой еды
+              отмечаются отдельно. Подробности покупок и оценки стоимости доступны в списке покупок.
+            </p>
+          </details>
         </>
       ) : null}
+      <details className="today-day-settings">
+        <summary>Запасы и настройки дня</summary>
+        <Link to={`/menu-preview?date=${selectedDate}`}>Подобрать меню на один день</Link>
+        {plan && <PlanInventory key={plan.id} plan={plan} />}
+      </details>
       {add && <LiveAddToPlan initialMeal={add} date={selectedDate} onClose={() => setAdd(null)} />}{' '}
       {detail && <SnapshotDialog entry={detail} onClose={() => setDetail(null)} />}
       {confirm && plan && !confirmed && (
@@ -589,6 +645,6 @@ export default function LivePlanner({ week = false }: { week?: boolean }) {
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }

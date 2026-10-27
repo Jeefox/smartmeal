@@ -77,9 +77,8 @@ test('creates and edits a person with their own target and allergies, then selec
   await page.getByRole('button', { name: 'Сохранить профиль', exact: true }).click();
   await page.getByRole('link', { name: 'Подобрать общее меню' }).click();
   await page.getByRole('checkbox', { name: 'Анна · 1 700 ккал' }).check();
-  await expect(page.getByRole('group', { name: 'Для кого готовим' })).toContainText(
-    'Бюджет — на всех',
-  );
+  await expect(page.getByRole('group', { name: 'Для кого готовим' })).toContainText('Анна');
+  await expect(page.getByText('Общая сумма на 2 чел.')).toBeVisible();
   expect(state.requests).toHaveLength(2);
 });
 test('archives a person after confirmation and clearly preserves saved menus', async ({ page }) => {

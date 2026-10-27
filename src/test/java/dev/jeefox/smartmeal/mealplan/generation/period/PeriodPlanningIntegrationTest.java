@@ -161,14 +161,16 @@ class PeriodPlanningIntegrationTest {
         assertTrue(changed.revision() > view.revision());
         assertEquals(
                 alternative.recipeId(), changed.result().entries().getFirst().recipe().recipeId());
-        assertThrows(
-                PlanningException.class,
-                () ->
-                        service.lock(
-                                owner.getEmail(),
-                                view.id(),
-                                entry.id(),
-                                new Lock(view.revision(), true)));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                service.lock(
+                                        owner.getEmail(),
+                                        view.id(),
+                                        entry.id(),
+                                        new Lock(view.revision(), true)));
+        assertEquals("GENERATION_REVISION_CONFLICT", conflict.code());
         var locked =
                 service.lock(
                         owner.getEmail(),
@@ -192,14 +194,16 @@ class PeriodPlanningIntegrationTest {
         var view = service.create(owner.getEmail(), options(3));
         em.persist(new MealPlan(owner, from.plusDays(1)));
         em.flush();
-        assertThrows(
-                PlanningException.class,
-                () ->
-                        saves.commit(
-                                owner.getEmail(),
-                                view.id(),
-                                UUID.randomUUID(),
-                                new Commit(view.revision(), true)));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                saves.commit(
+                                        owner.getEmail(),
+                                        view.id(),
+                                        UUID.randomUUID(),
+                                        new Commit(view.revision(), true)));
+        assertEquals("MEAL_PLAN_DATE_CONFLICT", conflict.code());
         assertEquals(
                 1,
                 plans.findByUser_IdAndPlanDateBetweenOrderByPlanDateAsc(
@@ -218,14 +222,16 @@ class PeriodPlanningIntegrationTest {
                         PriceSource.MANUAL,
                         false));
         em.flush();
-        assertThrows(
-                PlanningException.class,
-                () ->
-                        saves.commit(
-                                owner.getEmail(),
-                                view.id(),
-                                UUID.randomUUID(),
-                                new Commit(view.revision(), true)));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                saves.commit(
+                                        owner.getEmail(),
+                                        view.id(),
+                                        UUID.randomUUID(),
+                                        new Commit(view.revision(), true)));
+        assertEquals("SHOPPING_ESTIMATE_CHANGED", conflict.code());
         var fresh = service.refresh(owner.getEmail(), view.id(), view.revision());
         assertEquals(view.result().entries(), fresh.result().entries());
         assertEquals(new BigDecimal("240.00"), fresh.result().shopping().knownPurchaseCost());
@@ -236,11 +242,11 @@ class PeriodPlanningIntegrationTest {
         var view = service.create(owner.getEmail(), options(1));
         mvc.perform(
                         get("/api/me/meal-plan-generations/{id}", view.id())
-                                .with(user("another@example.invalid")))
+                                .with(user("another@example.invalid").roles("CATALOG_EDITOR")))
                 .andExpect(status().isNotFound());
         mvc.perform(
                         post("/api/me/meal-plan-generations")
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .contentType("application/json")
                                 .content(mapper.writeValueAsString(options(1))))
                 .andExpect(status().isForbidden());
@@ -260,7 +266,7 @@ class PeriodPlanningIntegrationTest {
                         0L);
         mvc.perform(
                         post("/api/me/meal-plan-generations")
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(mapper.writeValueAsString(invalid)))
@@ -299,14 +305,16 @@ class PeriodPlanningIntegrationTest {
         var view = service.create(owner.getEmail(), options(1));
         em.find(UserProfile.class, owner.getId()).updateDailyCalorieTarget(2100);
         em.flush();
-        assertThrows(
-                PlanningException.class,
-                () ->
-                        saves.commit(
-                                owner.getEmail(),
-                                view.id(),
-                                UUID.randomUUID(),
-                                new Commit(view.revision(), true)));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                saves.commit(
+                                        owner.getEmail(),
+                                        view.id(),
+                                        UUID.randomUUID(),
+                                        new Commit(view.revision(), true)));
+        assertEquals("PLANNING_CONTEXT_CHANGED", conflict.code());
     }
 
     @Test
@@ -314,7 +322,7 @@ class PeriodPlanningIntegrationTest {
         String body =
                 mvc.perform(
                                 post("/api/me/meal-plan-generations")
-                                        .with(user(owner.getEmail()))
+                                        .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                         .with(csrf())
                                         .contentType("application/json")
                                         .content(mapper.writeValueAsString(options(1))))
@@ -329,7 +337,7 @@ class PeriodPlanningIntegrationTest {
         var view = mapper.readValue(body, View.class);
         mvc.perform(
                         post("/api/me/meal-plan-generations/{id}/commit", view.id())
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .header("Idempotency-Key", UUID.randomUUID())
                                 .contentType("application/json")
@@ -351,7 +359,7 @@ class PeriodPlanningIntegrationTest {
         em.clear();
         mvc.perform(
                         get("/api/me/meal-plan-generations/{id}", view.id())
-                                .with(user(owner.getEmail())))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR")))
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("GENERATION_EXPIRED"));
     }
@@ -383,21 +391,21 @@ class PeriodPlanningIntegrationTest {
         var recipe = view.result().entries().getFirst().recipe().recipeId();
         mvc.perform(
                         put("/api/recipes/{id}/planning", recipe)
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"minPortions\":2,\"maxPortions\":1,\"portionStep\":1}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(
                         put("/api/products/{id}/planning", product.getId())
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"allergenDataComplete\":true}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(
                         put("/api/products/{id}/planning", product.getId())
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(
@@ -409,12 +417,16 @@ class PeriodPlanningIntegrationTest {
     @Test
     void personalPreferencesAreEditableValidatedAndInvalidateOldPreview() throws Exception {
         var view = service.create(owner.getEmail(), options(1));
-        mvc.perform(get("/api/planning-restrictions").with(user(owner.getEmail())))
+        mvc.perform(
+                        get("/api/planning-restrictions")
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.allergens").isArray())
                 .andExpect(jsonPath("$.equipment").isArray());
         String preferences =
-                mvc.perform(get("/api/me/planning-preferences").with(user(owner.getEmail())))
+                mvc.perform(
+                                get("/api/me/planning-preferences")
+                                        .with(user(owner.getEmail()).roles("CATALOG_EDITOR")))
                         .andExpect(status().isOk())
                         .andReturn()
                         .getResponse()
@@ -430,17 +442,19 @@ class PeriodPlanningIntegrationTest {
                         current.values().equipmentIds());
         mvc.perform(
                         put("/api/me/planning-preferences")
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(mapper.writeValueAsString(changed)))
                 .andExpect(status().isOk());
-        assertThrows(
-                PlanningException.class,
-                () -> service.refresh(owner.getEmail(), view.id(), view.revision()));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () -> service.refresh(owner.getEmail(), view.id(), view.revision()));
+        assertEquals("PLANNING_CONTEXT_CHANGED", conflict.code());
         mvc.perform(
                         put("/api/me/planning-preferences")
-                                .with(user(owner.getEmail()))
+                                .with(user(owner.getEmail()).roles("CATALOG_EDITOR"))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(
@@ -456,14 +470,16 @@ class PeriodPlanningIntegrationTest {
                 UUID.randomUUID(),
                 new dev.jeefox.smartmeal.pantry.PantryModels.AddLot(
                         0, product.getId(), new BigDecimal("300"), pantry.today(), null));
-        assertThrows(
-                PlanningException.class,
-                () ->
-                        saves.commit(
-                                owner.getEmail(),
-                                generated.id(),
-                                UUID.randomUUID(),
-                                new Commit(generated.revision(), true)));
+        var conflict =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                saves.commit(
+                                        owner.getEmail(),
+                                        generated.id(),
+                                        UUID.randomUUID(),
+                                        new Commit(generated.revision(), true)));
+        assertEquals("PANTRY_CHANGED", conflict.code());
         var refreshed = service.refresh(owner.getEmail(), generated.id(), generated.revision());
         assertEquals(1L, refreshed.result().pantryRevision());
         var saved =
@@ -476,5 +492,215 @@ class PeriodPlanningIntegrationTest {
         var lot = pantry.view(owner.getEmail()).lots().getFirst();
         assertEquals(0, new BigDecimal("300").compareTo(lot.quantityOnHandG()));
         assertEquals(0, lot.reservedG().signum());
+    }
+
+    @Test
+    void replacementPreviewIsReadOnlyAndChangesExactlyOneMeal() {
+        var v = service.create(owner.getEmail(), options(2));
+        var e = v.result().entries().getFirst();
+        var a = service.alternatives(owner.getEmail(), v.id(), e.id()).getFirst();
+        assertNotNull(a.comparisonKey());
+        assertNotNull(a.impact());
+        assertTrue(a.goals().contains(ReplacementGoal.SAME_PRODUCTS));
+        assertEquals(v.revision(), service.get(owner.getEmail(), v.id()).revision());
+        var changed =
+                service.replace(
+                        owner.getEmail(),
+                        v.id(),
+                        e.id(),
+                        new Replacement(
+                                v.revision(),
+                                a.recipeId(),
+                                a.portions(),
+                                a.candidateKey(),
+                                null,
+                                a.comparisonKey()));
+        assertEquals(a.newPurchaseCost(), changed.result().shopping().estimatedTotal());
+        for (var unchanged : v.result().entries())
+            if (!unchanged.id().equals(e.id())) {
+                var other =
+                        changed.result().entries().stream()
+                                .filter(x -> x.id().equals(unchanged.id()))
+                                .findFirst()
+                                .orElseThrow();
+                assertEquals(unchanged.recipeFingerprint(), other.recipeFingerprint());
+                assertEquals(unchanged.portions(), other.portions());
+            }
+    }
+
+    @Test
+    void changedStockRequiresReviewBeforeAReplacementIsApplied() {
+        var v = service.create(owner.getEmail(), options(1));
+        var e = v.result().entries().getFirst();
+        var a = service.alternatives(owner.getEmail(), v.id(), e.id()).getFirst();
+        pantry.addLot(
+                owner.getEmail(),
+                UUID.randomUUID(),
+                new dev.jeefox.smartmeal.pantry.PantryModels.AddLot(
+                        pantry.view(owner.getEmail()).revision(),
+                        product.getId(),
+                        BigDecimal.TEN,
+                        pantry.today(),
+                        from.plusDays(7)));
+        var error =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                service.replace(
+                                        owner.getEmail(),
+                                        v.id(),
+                                        e.id(),
+                                        new Replacement(
+                                                v.revision(),
+                                                a.recipeId(),
+                                                a.portions(),
+                                                a.candidateKey(),
+                                                null,
+                                                a.comparisonKey())));
+        assertEquals("REPLACEMENT_COMPARISON_CHANGED", error.code());
+        assertEquals(v.revision(), service.get(owner.getEmail(), v.id()).revision());
+    }
+
+    @Test
+    void savedMenusDoNotOfferReplacementOfPotentiallyPreparedFood() {
+        var v = service.create(owner.getEmail(), options(1));
+        saves.commit(owner.getEmail(), v.id(), UUID.randomUUID(), new Commit(v.revision(), true));
+        var error =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                service.alternatives(
+                                        owner.getEmail(),
+                                        v.id(),
+                                        v.result().entries().getFirst().id()));
+        assertEquals("GENERATION_ALREADY_SAVED", error.code());
+    }
+
+    @Test
+    void changedPricesRequireReviewRatherThanApplyingAnOldEstimate() {
+        var v = service.create(owner.getEmail(), options(1));
+        var e = v.result().entries().getFirst();
+        var a = service.alternatives(owner.getEmail(), v.id(), e.id()).getFirst();
+        em.persist(
+                new PriceObservation(
+                        storeProduct,
+                        new BigDecimal("500"),
+                        Instant.now(),
+                        PriceSource.MANUAL,
+                        false));
+        em.flush();
+        var error =
+                assertThrows(
+                        PlanningException.class,
+                        () ->
+                                service.replace(
+                                        owner.getEmail(),
+                                        v.id(),
+                                        e.id(),
+                                        new Replacement(
+                                                v.revision(),
+                                                a.recipeId(),
+                                                a.portions(),
+                                                a.candidateKey(),
+                                                null,
+                                                a.comparisonKey())));
+        assertEquals("REPLACEMENT_COMPARISON_CHANGED", error.code());
+        assertEquals(v.revision(), service.get(owner.getEmail(), v.id()).revision());
+    }
+
+    @Test
+    void aFasterCheaperDishReportsTheAddedProductAndWholeBasketSaving() {
+        em.createNativeQuery("update store_products set package_weight_g=100 where id=:id")
+                .setParameter("id", storeProduct.getId())
+                .executeUpdate();
+        em.refresh(storeProduct);
+        var cheaperProduct =
+                new Product(
+                        product.getCategory(),
+                        "Другой продукт",
+                        null,
+                        100,
+                        BigDecimal.ONE,
+                        BigDecimal.ONE,
+                        BigDecimal.ONE);
+        em.persist(cheaperProduct);
+        var cheapRecipe = new Recipe("Быстрый вариант", null, "Приготовить", 5, 1);
+        cheapRecipe.changeMealTypes(Set.of(MealType.BREAKFAST));
+        em.persist(cheapRecipe);
+        em.persist(new RecipeIngredient(cheapRecipe, cheaperProduct, new BigDecimal("500"), 1));
+        var cheapSku =
+                new StoreProduct(storeProduct.getStore(), cheaperProduct, "Пачка 100 г", 100);
+        em.persist(cheapSku);
+        em.persist(
+                new PriceObservation(
+                        cheapSku,
+                        BigDecimal.ONE,
+                        Instant.now().minusSeconds(1),
+                        PriceSource.MANUAL,
+                        false));
+        em.flush();
+        var v = service.create(owner.getEmail(), options(1));
+        var costly =
+                em.createQuery("select r from Recipe r where r.name=:n", Recipe.class)
+                        .setParameter("n", "Тест BREAKFAST 0")
+                        .getSingleResult();
+        var slot =
+                v.result().entries().stream()
+                        .filter(e -> e.mealType() == MealType.BREAKFAST)
+                        .findFirst()
+                        .orElseThrow();
+        if (!slot.recipe().recipeId().equals(costly.getId()))
+            v =
+                    service.replace(
+                            owner.getEmail(),
+                            v.id(),
+                            slot.id(),
+                            new Replacement(v.revision(), costly.getId(), BigDecimal.ONE));
+        var a =
+                service.alternatives(owner.getEmail(), v.id(), slot.id()).stream()
+                        .filter(x -> x.recipeId().equals(cheapRecipe.getId()))
+                        .findFirst()
+                        .orElseThrow();
+        assertTrue(a.goals().contains(ReplacementGoal.CHEAPER));
+        assertTrue(a.goals().contains(ReplacementGoal.FASTER));
+        assertFalse(a.goals().contains(ReplacementGoal.SAME_PRODUCTS));
+        assertTrue(a.deltaPurchaseCost().signum() < 0);
+        assertEquals(cheaperProduct.getId(), a.impact().addedProducts().getFirst().productId());
+        assertEquals(5, a.impact().minutesSaved());
+        var next =
+                service.replace(
+                        owner.getEmail(),
+                        v.id(),
+                        slot.id(),
+                        new Replacement(
+                                v.revision(),
+                                a.recipeId(),
+                                a.portions(),
+                                a.candidateKey(),
+                                null,
+                                a.comparisonKey()));
+        assertEquals(a.newPurchaseCost(), next.result().shopping().estimatedTotal());
+    }
+
+    @Test
+    void retryAfterALostReplacementResponseDoesNotApplyAgain() {
+        var v = service.create(owner.getEmail(), options(1));
+        var entry = v.result().entries().getFirst();
+        var a = service.alternatives(owner.getEmail(), v.id(), entry.id()).getFirst();
+        var request =
+                new Replacement(
+                        v.revision(),
+                        a.recipeId(),
+                        a.portions(),
+                        a.candidateKey(),
+                        null,
+                        a.comparisonKey());
+        var changed = service.replace(owner.getEmail(), v.id(), entry.id(), request);
+        var error =
+                assertThrows(
+                        PlanningException.class,
+                        () -> service.replace(owner.getEmail(), v.id(), entry.id(), request));
+        assertEquals("GENERATION_REVISION_CONFLICT", error.code());
+        assertEquals(changed.revision(), service.get(owner.getEmail(), v.id()).revision());
     }
 }

@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class PlanningContextLoader {
+    @org.springframework.beans.factory.annotation.Autowired
+    private dev.jeefox.smartmeal.mealplan.balanced.BalancedDataService balancedData;
+
     private final UserRepository users;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -106,7 +109,7 @@ public class PlanningContextLoader {
             unsafeProducts.addAll(
                     jdbc.queryForList(
                             "select distinct product_id from product_allergens where allergen_id in"
-                                + " (:ids)",
+                                    + " (:ids)",
                             Map.of("ids", extraAllergies),
                             Long.class));
         var selectedChains =
@@ -155,6 +158,53 @@ public class PlanningContextLoader {
                                 "CATALOGUE_SEARCH_LIMIT",
                                 "Часть каталога не вошла в поиск; результат не гарантирует"
                                         + " глобальный минимум."));
+            if (found.isEmpty()) {
+                long catalog =
+                        jdbc.queryForObject(
+                                "select count(*) from recipes r join recipe_meal_types mt on"
+                                    + " mt.recipe_id=r.id where r.catalogue_visible and"
+                                    + " mt.meal_type=:m and exists(select 1 from recipe_ingredients"
+                                    + " i where i.recipe_id=r.id)",
+                                Map.of("m", meal.name()),
+                                Long.class);
+                long timely =
+                        jdbc.queryForObject(
+                                "select count(*) from recipes r join recipe_meal_types mt on"
+                                    + " mt.recipe_id=r.id where r.catalogue_visible and"
+                                    + " mt.meal_type=:m and r.preparation_time_min<=:t and"
+                                    + " exists(select 1 from recipe_ingredients i where"
+                                    + " i.recipe_id=r.id)",
+                                Map.of(
+                                        "m",
+                                        meal.name(),
+                                        "t",
+                                        options.maxPreparationTimeByMeal().get(meal)),
+                                Long.class);
+                String label =
+                        switch (meal) {
+                            case BREAKFAST -> "Завтрак";
+                            case LUNCH -> "Обед";
+                            default -> "Ужин";
+                        };
+                issues.add(
+                        new Issue(
+                                "CANDIDATES_" + meal,
+                                label
+                                        + ": "
+                                        + (catalog == 0
+                                                ? "в каталоге нет рецептов для этого приёма пищи."
+                                                      + " Добавьте подходящие рецепты."
+                                                : timely == 0
+                                                        ? "ни один рецепт не укладывается в"
+                                                              + " заданное время. Увеличьте время"
+                                                              + " приготовления."
+                                                        : "после проверки исключённых продуктов,"
+                                                              + " аллергенов и оборудования не"
+                                                              + " осталось рецептов. Проверьте"
+                                                              + " оборудование или добавьте"
+                                                              + " совместимые рецепты; ограничения"
+                                                              + " безопасности сохраняются.")));
+            }
             eligible.put(meal, found.stream().limit(500).toList());
             found.stream().limit(500).forEach(r -> unique.put(r.getId(), r));
         }
@@ -205,12 +255,18 @@ public class PlanningContextLoader {
             for (var entry : historyEntries) {
                 if (entry.getMealPlan().getStatus() == MealPlanStatus.CANCELLED
                         && !deducted.contains(entry.getId())) continue;
-                lastUsed.merge(
-                        entry.getRecipeSnapshot().recipeId(),
-                        dates.get(entry.getMealPlan().getId()),
-                        (a, b) -> a.isAfter(b) ? a : b);
+                var snapshot = entry.getRecipeSnapshot();
+                var ids = new HashSet<UUID>();
+                ids.add(snapshot.recipeId());
+                snapshot.components().forEach(component -> ids.add(component.recipe().recipeId()));
+                for (var recipeId : ids)
+                    lastUsed.merge(
+                            recipeId,
+                            dates.get(entry.getMealPlan().getId()),
+                            (a, b) -> a.isAfter(b) ? a : b);
             }
         }
+        restriction.append(new TreeMap<>(lastUsed));
         Map<UUID, String> covers = new HashMap<>();
         if (!unique.isEmpty())
             jdbc.query(
@@ -359,16 +415,18 @@ and expires_at>:now and retrieved_at<=:now order by id
                             }
                         });
         }
-        return new PlanningContext(
-                owner.getId(),
-                target,
-                hash(restriction.toString()),
-                now,
-                Collections.unmodifiableMap(candidates),
-                List.copyOf(offers),
-                List.copyOf(issues),
-                stock,
-                List.copyOf(participants));
+        return balancedData.enrich(
+                new PlanningContext(
+                        owner.getId(),
+                        target,
+                        hash(restriction.toString()),
+                        now,
+                        Collections.unmodifiableMap(candidates),
+                        List.copyOf(offers),
+                        List.copyOf(issues),
+                        stock,
+                        List.copyOf(participants)),
+                options);
     }
 
     static String hash(String value) {

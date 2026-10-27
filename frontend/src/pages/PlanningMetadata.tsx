@@ -1,3 +1,4 @@
+import PortionMetadata from '../components/PortionMetadata';
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -107,7 +108,10 @@ function LivePlanningMetadata({ product = false }: { product?: boolean }) {
                   maxLength={500}
                   value={(draft as ProductSettings).verificationNote || ''}
                   onChange={(e) =>
-                    setDraft({ ...draft, verificationNote: e.target.value } as ProductSettings)
+                    setDraft({
+                      ...draft,
+                      verificationNote: e.target.value,
+                    } as ProductSettings)
                   }
                 />
               </label>
@@ -202,6 +206,7 @@ function LivePlanningMetadata({ product = false }: { product?: boolean }) {
           </button>
         </form>
       )}
+      <PortionMetadata id={id!} product={product} />
       <Link to={product ? '/products' : `/recipes/${id}`}>Вернуться в каталог</Link>
     </>
   );

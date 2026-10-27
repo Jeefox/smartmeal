@@ -16,7 +16,31 @@ public record PlanningContext(
         List<Offer> offers,
         List<Issue> issues,
         dev.jeefox.smartmeal.pantry.PantryModels.Snapshot pantry,
-        List<dev.jeefox.smartmeal.household.HouseholdModels.Participant> participants) {
+        List<dev.jeefox.smartmeal.household.HouseholdModels.Participant> participants,
+        dev.jeefox.smartmeal.mealplan.balanced.BalancedModels.Context balanced) {
+    public PlanningContext(
+            UUID ownerId,
+            int target,
+            String fingerprint,
+            Instant asOf,
+            Map<MealType, List<Candidate>> candidates,
+            List<Offer> offers,
+            List<Issue> issues,
+            dev.jeefox.smartmeal.pantry.PantryModels.Snapshot pantry,
+            List<dev.jeefox.smartmeal.household.HouseholdModels.Participant> participants) {
+        this(
+                ownerId,
+                target,
+                fingerprint,
+                asOf,
+                candidates,
+                offers,
+                issues,
+                pantry,
+                participants,
+                dev.jeefox.smartmeal.mealplan.balanced.BalancedModels.Context.empty());
+    }
+
     public PlanningContext(
             UUID ownerId,
             int target,

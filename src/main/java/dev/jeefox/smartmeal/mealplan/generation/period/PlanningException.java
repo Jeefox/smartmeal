@@ -20,6 +20,10 @@ public class PlanningException extends RuntimeException {
         return code;
     }
 
+    public static PlanningException conflict(String code, String message) {
+        return new PlanningException(HttpStatus.CONFLICT, code, message);
+    }
+
     public static PlanningException conflict(String message) {
         return new PlanningException(HttpStatus.CONFLICT, "PREVIEW_CONFLICT", message);
     }

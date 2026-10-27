@@ -6,6 +6,8 @@ import { calendarDay } from './shopping';
 
 export type PlanningMeal = Exclude<ApiMealType, 'SNACK'>;
 export type PlanningOptions = {
+  balancedMeals?: boolean;
+  maxShoppingProducts?: number | null;
   from: string;
   to: string;
   budgetRub: number | null;
@@ -95,7 +97,25 @@ export type PeriodView = {
     searchStatus: string;
   };
 };
+export type ReplacementGoal = 'SAME_PRODUCTS' | 'CHEAPER' | 'FASTER';
 export type Alternative = {
+  goals?: ReplacementGoal[];
+  comparisonKey?: string;
+  impact?: {
+    addedProducts: { productId: number; name: string }[];
+    removedProducts: { productId: number; name: string }[];
+    purchaseProductsBefore: number;
+    purchaseProductsAfter: number;
+    minutesSaved: number;
+    usePantry: boolean;
+    pantryRevision: number;
+    previousPurchaseCost?: number | null;
+    dataAsOf?: string;
+    personPortions: import('./household').PersonPortion[];
+  };
+  candidateKey?: string;
+  componentId?: string;
+  proposedRecipe?: RecipeSnapshot;
   recipeId: string;
   name: string;
   portions: number;
@@ -117,9 +137,9 @@ export const periodApi = {
     request<PeriodView>(base, body('POST', options, signal)),
   get: (id: string, signal?: AbortSignal) =>
     request<PeriodView>(`${base}/${encodeURIComponent(id)}`, { signal }),
-  alternatives: (view: PeriodView, entry: Selection, signal?: AbortSignal) =>
+  alternatives: (view: PeriodView, entry: Selection, signal?: AbortSignal, componentId?: string) =>
     request<Alternative[]>(
-      `${base}/${view.id}/entries/${encodeURIComponent(entry.id)}/alternatives`,
+      `${base}/${view.id}/entries/${encodeURIComponent(entry.id)}/alternatives${componentId ? `?componentId=${encodeURIComponent(componentId)}` : ''}`,
       { signal },
     ),
   lock: (view: PeriodView, entry: Selection, signal?: AbortSignal) =>
@@ -136,9 +156,27 @@ export const periodApi = {
           expectedRevision: view.revision,
           recipeId: alternative.recipeId,
           portions: alternative.portions,
+          comparisonKey: alternative.comparisonKey,
+          ...(alternative.candidateKey
+            ? {
+                candidateKey: alternative.candidateKey,
+                componentId: alternative.componentId,
+              }
+            : {}),
         },
         signal,
       ),
+    ),
+  lockComponent: (
+    view: PeriodView,
+    entry: Selection,
+    componentId: string,
+    locked: boolean,
+    signal?: AbortSignal,
+  ) =>
+    request<PeriodView>(
+      `${base}/${view.id}/entries/${encodeURIComponent(entry.id)}/components/${encodeURIComponent(componentId)}/lock`,
+      body('PATCH', { expectedRevision: view.revision, locked }, signal),
     ),
   regenerate: (view: PeriodView, signal?: AbortSignal) =>
     request<PeriodView>(
@@ -172,6 +210,13 @@ export function validatePlanningOptions(value: PlanningOptions): string | null {
     new Set(value.householdMemberIds || []).size !== (value.householdMemberIds?.length || 0)
   )
     return 'Выберите до 9 разных профилей семьи.';
+  if (
+    value.maxShoppingProducts != null &&
+    (!Number.isInteger(value.maxShoppingProducts) ||
+      value.maxShoppingProducts < 1 ||
+      value.maxShoppingProducts > 50)
+  )
+    return 'Предел покупок: целое число от 1 до 50.';
   if (!value.city.trim() || value.city.trim().length > 120) return 'Укажите город.';
   if (
     value.budgetRub != null &&
